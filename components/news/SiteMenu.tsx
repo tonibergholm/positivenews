@@ -38,6 +38,14 @@ export function SiteMenu() {
       {open && (
         <div className="absolute right-0 top-full mt-1 w-48 rounded-lg border border-border bg-card shadow-lg py-1 z-50">
           <Link
+            href="/sources"
+            onClick={() => setOpen(false)}
+            className="block px-4 py-2 text-sm text-foreground hover:bg-secondary transition-colors"
+          >
+            News Sources
+          </Link>
+          <div className="my-1 border-t border-border/60" />
+          <Link
             href="/privacy"
             onClick={() => setOpen(false)}
             className="block px-4 py-2 text-sm text-foreground hover:bg-secondary transition-colors"
