@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { timeAgo } from "@/src/lib/timeAgo";
 import { ArticleWithSource } from "@/src/lib/types";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const CATEGORY_COLORS: Record<string, string> = {
   Science:     "bg-sky-100 text-sky-700 border-sky-200",
@@ -22,6 +22,30 @@ const CATEGORY_PLACEHOLDERS: Record<string, string> = {
   Innovation:  "/news/placeholder-innovation.svg",
 };
 
+const STORAGE_KEY = "positivenews:read";
+
+function getReadIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function markAsRead(id: string) {
+  try {
+    const ids = getReadIds();
+    ids.add(id);
+    // Keep only the last 500 entries to avoid unbounded growth
+    const arr = [...ids];
+    if (arr.length > 500) arr.splice(0, arr.length - 500);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+  } catch {
+    // localStorage unavailable
+  }
+}
+
 interface ArticleCardProps {
   article: ArticleWithSource;
   onFlagged?: (id: string) => void;
@@ -38,6 +62,16 @@ export function ArticleCard({ article, onFlagged }: ArticleCardProps) {
   const [imageSrc, setImageSrc] = useState(article.imageUrl ?? placeholder);
   const [flagging, setFlagging] = useState(false);
   const [hidden, setHidden] = useState(false);
+  const [isRead, setIsRead] = useState(false);
+
+  useEffect(() => {
+    setIsRead(getReadIds().has(article.id));
+  }, [article.id]);
+
+  function handleClick() {
+    markAsRead(article.id);
+    setIsRead(true);
+  }
 
   async function handleFlag(e: React.MouseEvent) {
     e.preventDefault();
@@ -64,9 +98,13 @@ export function ArticleCard({ article, onFlagged }: ArticleCardProps) {
       target="_blank"
       rel="noopener noreferrer"
       className="group block h-full"
+      onClick={handleClick}
     >
-      <Card className="relative h-full overflow-hidden transition-all duration-200 group-hover:shadow-md group-hover:-translate-y-0.5 border-border/60">
+      <Card className={`relative h-full overflow-hidden transition-all duration-200 group-hover:shadow-md group-hover:-translate-y-0.5 border-border/60 ${isRead ? "opacity-60" : ""}`}>
         <div className="relative h-44 w-full overflow-hidden bg-muted">
+          {isRead && (
+            <div className="absolute inset-0 bg-black/20 z-[1]" />
+          )}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={imageSrc}
@@ -75,6 +113,16 @@ export function ArticleCard({ article, onFlagged }: ArticleCardProps) {
             onError={() => setImageSrc(placeholder)}
             loading="lazy"
           />
+
+          {/* Read indicator */}
+          {isRead && (
+            <div className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-medium text-white/90 backdrop-blur-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="size-3">
+                <path fillRule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" clipRule="evenodd" />
+              </svg>
+              Read
+            </div>
+          )}
 
           {/* Flag button */}
           <button
@@ -104,7 +152,7 @@ export function ArticleCard({ article, onFlagged }: ArticleCardProps) {
             </Badge>
           </div>
 
-          <h2 className="text-sm font-semibold leading-snug line-clamp-3 text-foreground group-hover:text-primary transition-colors">
+          <h2 className={`text-sm font-semibold leading-snug line-clamp-3 transition-colors ${isRead ? "text-muted-foreground" : "text-foreground group-hover:text-primary"}`}>
             {article.title}
           </h2>
 
