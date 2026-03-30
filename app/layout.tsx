@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DM_Sans, Fraunces, Geist_Mono } from "next/font/google";
+import Link from "next/link";
 import { ThemeToggle } from "@/components/news/ThemeToggle";
 import "./globals.css";
 
@@ -62,7 +63,19 @@ export default function RootLayout({
         </main>
 
         <footer className="border-t border-border/60 py-6 text-center text-xs text-muted-foreground">
-          PositiveNews — aggregating constructive journalism since today
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
+            <span>PositiveNews — aggregating constructive journalism</span>
+            <span className="hidden sm:inline text-border">|</span>
+            <nav className="flex items-center gap-3">
+              <Link href="/privacy" className="hover:text-foreground transition-colors">
+                Privacy Policy
+              </Link>
+              <span className="text-border">·</span>
+              <Link href="/terms" className="hover:text-foreground transition-colors">
+                Terms of Service
+              </Link>
+            </nav>
+          </div>
         </footer>
       </body>
     </html>
