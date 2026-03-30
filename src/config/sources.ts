@@ -53,12 +53,6 @@ export const FEED_SOURCES: FeedSource[] = [
     language: "en",
   },
   {
-    name: "WebMD Health News",
-    url: "https://rssfeeds.webmd.com/rss/rss.aspx?RSSSource=RSS_PUBLIC",
-    category: "Health",
-    language: "en",
-  },
-  {
     name: "New Scientist – Health",
     url: "https://www.newscientist.com/subject/health/feed/",
     category: "Health",
@@ -74,12 +68,6 @@ export const FEED_SOURCES: FeedSource[] = [
   {
     name: "Positive.news – Environment",
     url: "https://www.positive.news/environment/feed/",
-    category: "Environment",
-    language: "en",
-  },
-  {
-    name: "EcoWatch",
-    url: "https://www.ecowatch.com/feeds/latest.rss",
     category: "Environment",
     language: "en",
   },
@@ -109,12 +97,6 @@ export const FEED_SOURCES: FeedSource[] = [
     language: "en",
   },
   {
-    name: "Springwise",
-    url: "https://www.springwise.com/feed/",
-    category: "Innovation",
-    language: "en",
-  },
-  {
     name: "The Guardian – Environment",
     url: "https://www.theguardian.com/environment/rss",
     category: "Environment",
@@ -125,6 +107,19 @@ export const FEED_SOURCES: FeedSource[] = [
     url: "https://www.wired.com/feed/category/science/latest/rss",
     category: "Science",
     language: "en",
+  },
+  // Finnish sources
+  {
+    name: "Yle Uutiset",
+    url: "https://feeds.yle.fi/uutiset/v1/recent.rss?publisherIds=YLE_UUTISET",
+    category: "Society",
+    language: "fi",
+  },
+  {
+    name: "Yle Kotimaa",
+    url: "https://feeds.yle.fi/uutiset/v1/recent.rss?publisherIds=YLE_UUTISET&concepts=18-34837",
+    category: "Society",
+    language: "fi",
   },
 ];
 
