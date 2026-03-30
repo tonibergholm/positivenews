@@ -23,7 +23,7 @@ export function ArticleGrid() {
       const params = new URLSearchParams({ page: String(p) });
       if (cat !== "All") params.set("category", cat);
 
-      const res = await fetch(`/api/articles?${params}`);
+      const res = await fetch(`/news/api/articles?${params}`);
       if (!res.ok) return;
       const data = await res.json();
 
