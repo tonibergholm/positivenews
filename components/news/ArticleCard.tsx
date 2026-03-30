@@ -152,7 +152,7 @@ export function ArticleCard({ article, onFlagged }: ArticleCardProps) {
             </Badge>
           </div>
 
-          <h2 className={`text-sm font-semibold leading-snug line-clamp-3 transition-colors ${isRead ? "text-muted-foreground" : "text-foreground group-hover:text-primary"}`}>
+          <h2 className={`font-heading text-[15px] font-semibold leading-snug line-clamp-3 transition-colors ${isRead ? "text-muted-foreground" : "text-foreground group-hover:text-primary"}`}>
             {article.title}
           </h2>
 

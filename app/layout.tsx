@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { DM_Sans, Fraunces, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const dmSans = DM_Sans({
+  variable: "--font-dm-sans",
+  subsets: ["latin"],
+});
+
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
   subsets: ["latin"],
 });
 
@@ -26,7 +31,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${dmSans.variable} ${fraunces.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background">
         <header className="sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -34,7 +39,7 @@ export default function RootLayout({
             <span className="text-2xl select-none" aria-hidden>
               ☀️
             </span>
-            <span className="font-bold text-lg tracking-tight text-foreground">
+            <span className="font-heading font-semibold text-lg tracking-tight text-foreground">
               PositiveNews
             </span>
             <span className="hidden sm:inline text-xs text-muted-foreground ml-1 mt-0.5">
