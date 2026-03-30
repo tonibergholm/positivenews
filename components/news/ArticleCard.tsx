@@ -101,7 +101,7 @@ export function ArticleCard({ article, onFlagged }: ArticleCardProps) {
       onClick={handleClick}
     >
       <Card className={`relative h-full overflow-hidden transition-all duration-200 group-hover:shadow-md group-hover:-translate-y-0.5 border-border/60 ${isRead ? "opacity-60" : ""}`}>
-        <div className="relative h-44 w-full overflow-hidden bg-muted">
+        <div className="relative h-36 w-full overflow-hidden bg-muted">
           {isRead && (
             <div className="absolute inset-0 bg-black/20 z-[1]" />
           )}
@@ -162,7 +162,7 @@ export function ArticleCard({ article, onFlagged }: ArticleCardProps) {
             </p>
           )}
 
-          <div className="mt-auto flex items-center justify-between pt-2 text-xs text-muted-foreground">
+          <div className="mt-auto flex items-center justify-between pt-2 border-t border-border/60 text-xs text-muted-foreground">
             <span className="font-medium truncate max-w-[60%]">
               {article.source.name}
             </span>

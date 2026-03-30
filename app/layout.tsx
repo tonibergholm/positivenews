@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DM_Sans, Fraunces, Geist_Mono } from "next/font/google";
+import { ThemeToggle } from "@/components/news/ThemeToggle";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -45,6 +46,9 @@ export default function RootLayout({
             <span className="hidden sm:inline text-xs text-muted-foreground ml-1 mt-0.5">
               Good things happening in the world
             </span>
+            <div className="ml-auto">
+              <ThemeToggle />
+            </div>
           </div>
         </header>
 
