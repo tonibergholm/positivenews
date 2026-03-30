@@ -69,6 +69,10 @@ export default function RootLayout({
             <span>PositiveNews — aggregating constructive journalism</span>
             <span className="hidden sm:inline text-border">|</span>
             <nav className="flex items-center gap-3">
+              <Link href="/sources" className="hover:text-foreground transition-colors">
+                News Sources
+              </Link>
+              <span className="text-border">·</span>
               <Link href="/privacy" className="hover:text-foreground transition-colors">
                 Privacy Policy
               </Link>
