@@ -1,8 +1,11 @@
+"use client";
+
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { timeAgo } from "@/src/lib/timeAgo";
 import { ArticleWithSource } from "@/src/lib/types";
 import Image from "next/image";
+import { useState } from "react";
 
 const CATEGORY_COLORS: Record<string, string> = {
   Science:     "bg-sky-100 text-sky-700 border-sky-200",
@@ -29,10 +32,10 @@ export function ArticleCard({ article }: ArticleCardProps) {
     CATEGORY_COLORS[article.category] ??
     "bg-gray-100 text-gray-700 border-gray-200";
 
-  const imageSrc =
-    article.imageUrl ??
-    CATEGORY_PLACEHOLDERS[article.category] ??
-    "/placeholder-innovation.svg";
+  const placeholder =
+    CATEGORY_PLACEHOLDERS[article.category] ?? "/placeholder-innovation.svg";
+
+  const [imageSrc, setImageSrc] = useState(article.imageUrl ?? placeholder);
 
   return (
     <a
@@ -50,6 +53,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
             className="object-cover transition-transform duration-300 group-hover:scale-105"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             unoptimized
+            onError={() => setImageSrc(placeholder)}
           />
         </div>
 
