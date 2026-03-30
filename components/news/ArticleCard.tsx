@@ -4,7 +4,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { timeAgo } from "@/src/lib/timeAgo";
 import { ArticleWithSource } from "@/src/lib/types";
-import Image from "next/image";
 import { useState } from "react";
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -16,11 +15,11 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 const CATEGORY_PLACEHOLDERS: Record<string, string> = {
-  Science:     "/placeholder-science.svg",
-  Environment: "/placeholder-environment.svg",
-  Society:     "/placeholder-society.svg",
-  Health:      "/placeholder-health.svg",
-  Innovation:  "/placeholder-innovation.svg",
+  Science:     "/news/placeholder-science.svg",
+  Environment: "/news/placeholder-environment.svg",
+  Society:     "/news/placeholder-society.svg",
+  Health:      "/news/placeholder-health.svg",
+  Innovation:  "/news/placeholder-innovation.svg",
 };
 
 interface ArticleCardProps {
@@ -33,7 +32,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
     "bg-gray-100 text-gray-700 border-gray-200";
 
   const placeholder =
-    CATEGORY_PLACEHOLDERS[article.category] ?? "/placeholder-innovation.svg";
+    CATEGORY_PLACEHOLDERS[article.category] ?? "/news/placeholder-innovation.svg";
 
   const [imageSrc, setImageSrc] = useState(article.imageUrl ?? placeholder);
 
@@ -46,14 +45,13 @@ export function ArticleCard({ article }: ArticleCardProps) {
     >
       <Card className="h-full overflow-hidden transition-all duration-200 group-hover:shadow-md group-hover:-translate-y-0.5 border-border/60">
         <div className="relative h-44 w-full overflow-hidden bg-muted">
-          <Image
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
             src={imageSrc}
             alt=""
-            fill
-            className="object-cover transition-transform duration-300 group-hover:scale-105"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            unoptimized
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
             onError={() => setImageSrc(placeholder)}
+            loading="lazy"
           />
         </div>
 
