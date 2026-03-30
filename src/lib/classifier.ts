@@ -1,18 +1,25 @@
 const OLLAMA_URL = process.env.OLLAMA_URL ?? "http://localhost:11434";
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "llama3.2:1b";
 
-const PROMPT_TEMPLATE = (text: string) =>
-  `You are a content filter for a positive news aggregator. Your job is to decide if a news article is uplifting, constructive, or beneficial — meaning it reports progress, solutions, achievements, breakthroughs, or good outcomes for people or the planet.
+function buildPrompt(text: string, language: string): string {
+  const langNote =
+    language !== "en"
+      ? `Note: The article may be in a language other than English (language code: ${language}). Evaluate based on the topic and context even if you don't fully understand every word.\n\n`
+      : "";
 
-Reject articles that are primarily about: violence, crime, accidents, disasters, wars, political conflict, economic crises, fear, or suffering.
+  return `You are a content filter for a positive news aggregator. Decide if a news article is uplifting, constructive, or beneficial — reporting progress, solutions, achievements, breakthroughs, or good outcomes for people or the planet.
+
+${langNote}Reject articles that are primarily about: violence, crime, accidents, disasters, wars, political conflict, economic crises, corruption, fear, or suffering.
 
 Article: "${text}"
 
 Reply with only YES or NO.`;
+}
 
 export async function classifyPositive(
   title: string,
-  summary?: string | null
+  summary?: string | null,
+  language = "en"
 ): Promise<boolean> {
   const text = summary
     ? `${title} — ${summary.slice(0, 250)}`
@@ -24,7 +31,7 @@ export async function classifyPositive(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: OLLAMA_MODEL,
-        prompt: PROMPT_TEMPLATE(text),
+        prompt: buildPrompt(text, language),
         stream: false,
         options: { temperature: 0.0, num_predict: 5 },
       }),

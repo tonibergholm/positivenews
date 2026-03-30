@@ -11,33 +11,39 @@ export interface FeedSource {
   url: string;
   category: Exclude<Category, "All">;
   language: string;
+  /** true = curated positive-news outlet; skip LLM classification */
+  trusted?: boolean;
 }
 
 export const FEED_SOURCES: FeedSource[] = [
-  // Global wellbeing / uplifting news
+  // Global wellbeing / uplifting news — curated sources, always positive
   {
     name: "Good News Network",
     url: "https://www.goodnewsnetwork.org/feed/",
     category: "Society",
     language: "en",
+    trusted: true,
   },
   {
     name: "Positive News",
     url: "https://www.positive.news/feed/",
     category: "Society",
     language: "en",
+    trusted: true,
   },
   {
     name: "Reasons to be Cheerful",
     url: "https://reasonstobecheerful.world/feed/",
     category: "Society",
     language: "en",
+    trusted: true,
   },
   {
     name: "Upworthy",
     url: "https://www.upworthy.com/rss",
     category: "Society",
     language: "en",
+    trusted: true,
   },
   // Science & health breakthroughs
   {
@@ -89,12 +95,14 @@ export const FEED_SOURCES: FeedSource[] = [
     url: "https://www.optimistdaily.com/feed/",
     category: "Society",
     language: "en",
+    trusted: true,
   },
   {
     name: "YES! Magazine",
     url: "https://www.yesmagazine.org/rss/",
     category: "Society",
     language: "en",
+    trusted: true,
   },
   {
     name: "The Guardian – Environment",
