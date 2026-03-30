@@ -101,7 +101,7 @@ export function ArticleCard({ article, onFlagged }: ArticleCardProps) {
       onClick={handleClick}
     >
       <Card className={`relative h-full overflow-hidden transition-all duration-200 group-hover:shadow-md group-hover:-translate-y-0.5 border-border/60 ${isRead ? "opacity-60" : ""}`}>
-        <div className="relative h-36 w-full overflow-hidden bg-muted">
+        <div className="relative h-28 sm:h-36 w-full overflow-hidden bg-muted">
           {isRead && (
             <div className="absolute inset-0 bg-black/20 z-[1]" />
           )}
@@ -142,27 +142,25 @@ export function ArticleCard({ article, onFlagged }: ArticleCardProps) {
           </button>
         </div>
 
-        <CardContent className="flex flex-col gap-2 p-4">
+        <CardContent className="flex flex-col gap-1.5 sm:gap-2 p-3 sm:p-4">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge
               variant="outline"
-              className={`text-xs font-medium px-2 py-0.5 ${badgeClass}`}
+              className={`text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 ${badgeClass}`}
             >
               {article.category}
             </Badge>
           </div>
 
-          <h2 className={`font-heading text-[15px] font-semibold leading-snug line-clamp-3 transition-colors ${isRead ? "text-muted-foreground" : "text-foreground group-hover:text-primary"}`}>
+          <h2 className={`font-heading text-[13px] sm:text-[15px] font-semibold leading-snug line-clamp-2 sm:line-clamp-3 transition-colors ${isRead ? "text-muted-foreground" : "text-foreground group-hover:text-primary"}`}>
             {article.title}
           </h2>
 
-          {article.summary && (
-            <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-              {article.summary}
-            </p>
-          )}
+          <p className="hidden sm:block text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+            {article.summary}
+          </p>
 
-          <div className="mt-auto flex items-center justify-between pt-2 border-t border-border/60 text-xs text-muted-foreground">
+          <div className="mt-auto flex items-center justify-between pt-1.5 sm:pt-2 border-t border-border/60 text-[10px] sm:text-xs text-muted-foreground">
             <span className="font-medium truncate max-w-[60%]">
               {article.source.name}
             </span>

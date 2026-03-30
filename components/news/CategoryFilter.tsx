@@ -24,12 +24,12 @@ export function CategoryFilter({
 }: CategoryFilterProps) {
   return (
     <Tabs value={active} onValueChange={onChange}>
-      <TabsList className="h-auto flex flex-wrap gap-1 bg-muted/60 p-1">
+      <TabsList className="h-auto flex gap-1 bg-muted/60 p-1 overflow-x-auto scrollbar-none">
         {categories.map((cat) => (
           <TabsTrigger
             key={cat}
             value={cat}
-            className="text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            className="text-xs sm:text-sm whitespace-nowrap data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
           >
             {CATEGORY_EMOJI[cat]} {cat}
           </TabsTrigger>
