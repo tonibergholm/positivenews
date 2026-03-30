@@ -32,6 +32,7 @@ model Article {
   category    String
   isPositive  Boolean  @default(true)
   flaggedAt   DateTime?
+  curatedAt   DateTime?
   createdAt   DateTime @default(now())
 }
 
