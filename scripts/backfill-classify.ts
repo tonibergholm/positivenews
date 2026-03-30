@@ -8,7 +8,7 @@
  */
 import "dotenv/config";
 import { prisma } from "../src/lib/prisma";
-import { classifyPositive } from "../src/lib/classifier";
+import { classifyPositiveSync as classifyPositive } from "../src/lib/classifier";
 import { FEED_SOURCES } from "../src/config/sources";
 
 const BATCH_SIZE = 100;

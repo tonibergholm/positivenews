@@ -31,5 +31,14 @@ model Article {
   sourceId    String
   category    String
   isPositive  Boolean  @default(true)
+  flaggedAt   DateTime?
   createdAt   DateTime @default(now())
+}
+
+model LearnedKeyword {
+  id       String  @id @default(cuid())
+  keyword  String  @unique
+  language String  @default("en")
+  hits     Int     @default(1)
+  active   Boolean @default(false)
 }

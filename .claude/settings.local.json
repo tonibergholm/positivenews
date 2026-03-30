@@ -3,7 +3,21 @@
     "allow": [
       "Bash(pnpm create:*)",
       "Bash(npm install:*)",
-      "Bash(npx shadcn@latest init -d)"
+      "Bash(npx shadcn@latest init -d)",
+      "Bash(ssh:*)",
+      "Bash(git rm:*)",
+      "Bash(git commit -m \"chore: remove dev.db from tracking:*)",
+      "Bash(git push:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"fix: use full /news prefix in API fetch for basePath compatibility:*)",
+      "Bash(git commit -m \"fix: fall back to category placeholder on broken image:*)",
+      "Bash(git commit -m \"fix: use plain img tag with onError for reliable image fallback:*)",
+      "Bash(git commit -m \"feat: add Finnish Yle sources, remove broken WebMD/EcoWatch/Springwise feeds:*)",
+      "Bash(git commit -m \"feat: add remaining Finnish sources \\(HS, IS, T&T, Tivi, Yle Kulttuuri/Ulkomaat\\):*)",
+      "Bash(git commit:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npx prisma:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

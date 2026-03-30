@@ -1,116 +1,103 @@
 /**
  * Positive-news classifier.
  *
- * Uses keyword matching with Finnish stem awareness. Small local LLMs
- * (1-3 B) proved unreliable at nuanced sentiment classification,
- * especially for Finnish text, so we use a deterministic approach.
- *
- * The keyword lists target clearly negative content (violence, war,
- * disasters, crime). Articles without strong negative signals pass.
+ * Uses keyword matching with Finnish stem awareness plus learned
+ * keywords from user feedback. Learned keywords are cached in memory
+ * and refreshed every 5 minutes.
  */
 
-// Negative stems / keywords — we check if any token STARTS WITH these.
-// Using stems handles Finnish inflection (e.g. "murha" matches
-// "murhasta", "murhan", "murhattiin").
+import { prisma } from "./prisma";
+
+// ── Built-in negative stems ─────────────────────────────────────────
+
 const NEGATIVE_STEMS_FI = [
-  "murha",    // murder
-  "surma",    // killing
-  "puukot",   // stabbing
-  "ampum",    // shooting
-  "kuol",     // death/died
-  "kuolem",   // death (noun forms)
-  "tappo",    // manslaughter
-  "tappa",    // to kill
-  "tapett",   // killed
-  "terrori",  // terrorism
-  "hyökkä",   // attack
-  "pommi",    // bomb
-  "räjähd",   // explosion
-  "tulipalo", // fire
-  "palo",     // fire (compound: tehdaspalo, metsäpalo)
-  "onnettom", // accident
-  "kolari",   // collision/crash
-  "turma",    // fatal accident
-  "uhri",     // victim
-  "pahoinpi", // assault
-  "raisk",    // rape
-  "ryöst",    // robbery
-  "vanki",    // prisoner
-  "kidna",    // kidnapping
-  "maanjäri", // earthquake
-  "tsunami",
-  "hurrikaa", // hurricane
-  "bensa",    // skip — too common
+  // Violence & crime
+  "murha", "surma", "puukot", "ampum", "tappo", "tappa", "tapett",
+  "pahoinpi", "raisk", "ryöst", "kidna", "vanki",
+  // Death
+  "kuol", "kuolem",
+  // War & terror
+  "terrori", "hyökkä", "pommi", "räjähd", "sota",
+  // Disasters
+  "tulipalo", "palo", "onnettom", "kolari", "turma",
+  "maanjäri", "tsunami", "hurrikaa",
+  // Victims
+  "uhri",
+  // Irrelevant: sports scores
+  "ottelu", "liiga", "valioliig", "veikkausliig",
+  "sarjataul", "playoff",
+  // Irrelevant: car/product reviews
+  "koeajo", "pikatesti", "autotesti",
 ];
 
 const NEGATIVE_WORDS_EN = [
-  "shooting",
-  "murdered",
-  "murder",
-  "killed",
-  "killing",
-  "dead",
-  "death",
-  "deaths",
-  "massacre",
-  "bombing",
-  "bomber",
-  "terrorist",
-  "terrorism",
-  "attack",
-  "stabbed",
-  "stabbing",
-  "crash",
-  "crashed",
-  "earthquake",
-  "tsunami",
-  "hurricane",
-  "flood",
-  "wildfire",
-  "explosion",
-  "war",
-  "assault",
-  "robbery",
-  "kidnap",
-  "rape",
-  "victim",
-  "casualties",
-  "fatalities",
-  "devastat",
-  "carnage",
+  // Violence & crime
+  "shooting", "murdered", "murder", "killed", "killing",
+  "massacre", "bombing", "bomber", "stabbed", "stabbing",
+  "assault", "robbery", "kidnap", "rape", "carnage",
+  // Death & suffering
+  "dead", "death", "deaths", "victim", "casualties", "fatalities",
+  // War & terror
+  "terrorist", "terrorism", "attack", "war",
+  // Disasters
+  "crash", "crashed", "earthquake", "tsunami", "hurricane",
+  "flood", "wildfire", "explosion", "devastat",
+  // Irrelevant: sports scores
+  "scores", "standings", "playoff", "halftime",
+  "relegation", "matchday",
+  // Irrelevant: reviews
+  "test-drive", "hands-on-review",
 ];
 
-// Positive override stems — if these appear alongside negatives, lean positive.
-// E.g. "läpimurto" (breakthrough) contains "murto" but is positive.
+// ── Positive override stems ─────────────────────────────────────────
+
 const POSITIVE_OVERRIDES_FI = [
-  "läpimur",    // breakthrough
-  "selviyty",   // survived/surviving (positive framing)
-  "pelast",     // rescued/saved
-  "toipu",      // recovered
-  "paranne",    // improvement/cure
-  "edisty",     // progress
-  "voitt",      // win/victory
-  "ennätys",    // record (achievement)
-  "löytö",      // discovery
-  "keksint",    // invention
+  "läpimur", "selviyty", "pelast", "toipu", "paranne",
+  "edisty", "voitt", "ennätys", "löytö", "keksint",
 ];
 
 const POSITIVE_OVERRIDES_EN = [
-  "breakthrough",
-  "surviv",
-  "rescu",
-  "recover",
-  "cure",
-  "saved",
-  "progress",
-  "discover",
-  "solution",
-  "victory",
+  "breakthrough", "surviv", "rescu", "recover", "cure",
+  "saved", "progress", "discover", "solution", "victory",
   "record-break",
 ];
 
-// Minimum negative keyword hits to classify as negative
-const THRESHOLD = 1;
+// ── Learned keywords cache ──────────────────────────────────────────
+
+interface LearnedCache {
+  fi: string[];
+  en: string[];
+  loadedAt: number;
+}
+
+let learnedCache: LearnedCache = { fi: [], en: [], loadedAt: 0 };
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+export async function refreshLearnedKeywords(): Promise<void> {
+  try {
+    const keywords: { keyword: string; language: string }[] =
+      await (prisma as any).learnedKeyword.findMany({
+        where: { active: true },
+        select: { keyword: true, language: true },
+      });
+    learnedCache = {
+      fi: keywords.filter((k) => k.language === "fi").map((k) => k.keyword),
+      en: keywords.filter((k) => k.language === "en").map((k) => k.keyword),
+      loadedAt: Date.now(),
+    };
+  } catch {
+    // DB unavailable — keep stale cache
+  }
+}
+
+async function getLearnedKeywords(language: string): Promise<string[]> {
+  if (Date.now() - learnedCache.loadedAt > CACHE_TTL) {
+    await refreshLearnedKeywords();
+  }
+  return language === "fi" ? learnedCache.fi : learnedCache.en;
+}
+
+// ── Tokenizer & matcher ─────────────────────────────────────────────
 
 function tokenize(text: string): string[] {
   return text
@@ -133,7 +120,42 @@ function stemMatch(tokens: string[], stems: string[], useIncludes: boolean): num
   return hits;
 }
 
-export function classifyPositive(
+// ── Public API ──────────────────────────────────────────────────────
+
+const THRESHOLD = 1;
+
+export async function classifyPositive(
+  title: string,
+  summary?: string | null,
+  language = "en"
+): Promise<boolean> {
+  const text = summary
+    ? `${title} ${summary.slice(0, 300)}`
+    : title;
+
+  const tokens = tokenize(text);
+  const isFinnish = language === "fi";
+
+  const builtInNeg = isFinnish ? NEGATIVE_STEMS_FI : NEGATIVE_WORDS_EN;
+  const posStemsList = isFinnish ? POSITIVE_OVERRIDES_FI : POSITIVE_OVERRIDES_EN;
+  const learned = await getLearnedKeywords(language);
+
+  // Merge built-in + learned keywords
+  const allNegative = [...builtInNeg, ...learned];
+
+  const negHits = stemMatch(tokens, allNegative, isFinnish);
+  const posHits = stemMatch(tokens, posStemsList, isFinnish);
+
+  // Positive overrides negative when both present
+  if (posHits > 0 && negHits <= posHits) return true;
+
+  return negHits < THRESHOLD;
+}
+
+/**
+ * Synchronous version for the backfill script (no learned keywords).
+ */
+export function classifyPositiveSync(
   title: string,
   summary?: string | null,
   language = "en"
@@ -143,16 +165,11 @@ export function classifyPositive(
     : title;
 
   const tokens = tokenize(text);
-
-  const negativeStems = language === "fi" ? NEGATIVE_STEMS_FI : NEGATIVE_WORDS_EN;
-  const positiveStems = language === "fi" ? POSITIVE_OVERRIDES_FI : POSITIVE_OVERRIDES_EN;
-
   const isFinnish = language === "fi";
-  const negHits = stemMatch(tokens, negativeStems, isFinnish);
-  const posHits = stemMatch(tokens, positiveStems, isFinnish);
 
-  // If positive signals present alongside negative, lean positive
+  const negHits = stemMatch(tokens, isFinnish ? NEGATIVE_STEMS_FI : NEGATIVE_WORDS_EN, isFinnish);
+  const posHits = stemMatch(tokens, isFinnish ? POSITIVE_OVERRIDES_FI : POSITIVE_OVERRIDES_EN, isFinnish);
+
   if (posHits > 0 && negHits <= posHits) return true;
-
   return negHits < THRESHOLD;
 }
