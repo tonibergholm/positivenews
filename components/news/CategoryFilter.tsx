@@ -23,18 +23,20 @@ export function CategoryFilter({
   onChange,
 }: CategoryFilterProps) {
   return (
-    <Tabs value={active} onValueChange={onChange}>
-      <TabsList className="h-auto flex gap-1 bg-muted/60 p-1 overflow-x-auto scrollbar-none">
-        {categories.map((cat) => (
-          <TabsTrigger
-            key={cat}
-            value={cat}
-            className="text-xs sm:text-sm whitespace-nowrap data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-          >
-            {CATEGORY_EMOJI[cat]} {cat}
-          </TabsTrigger>
-        ))}
-      </TabsList>
-    </Tabs>
+    <div className="overflow-x-auto scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0">
+      <Tabs value={active} onValueChange={onChange}>
+        <TabsList className="h-auto inline-flex gap-1 bg-muted/60 p-1">
+          {categories.map((cat) => (
+            <TabsTrigger
+              key={cat}
+              value={cat}
+              className="text-xs sm:text-sm whitespace-nowrap data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              {CATEGORY_EMOJI[cat]} {cat}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+    </div>
   );
 }
