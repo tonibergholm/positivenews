@@ -1,5 +1,5 @@
 const OLLAMA_URL = process.env.OLLAMA_URL ?? "http://localhost:11434";
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "qwen2.5:0.5b";
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "llama3.2:1b";
 
 const PROMPT_TEMPLATE = (text: string) =>
   `You are a content filter for a positive news aggregator. Your job is to decide if a news article is uplifting, constructive, or beneficial — meaning it reports progress, solutions, achievements, breakthroughs, or good outcomes for people or the planet.
