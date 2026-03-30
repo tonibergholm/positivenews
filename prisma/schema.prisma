@@ -1,0 +1,36 @@
+// Prisma schema — SQLite in dev, PostgreSQL-compatible (swap provider + URL only)
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Source {
+  id        String    @id @default(cuid())
+  name      String
+  url       String    @unique
+  category  String
+  language  String    @default("en")
+  isActive  Boolean   @default(true)
+  articles  Article[]
+  createdAt DateTime  @default(now())
+}
+
+model Article {
+  id          String   @id @default(cuid())
+  title       String
+  url         String   @unique
+  summary     String?
+  imageUrl    String?
+  publishedAt DateTime
+  source      Source   @relation(fields: [sourceId], references: [id])
+  sourceId    String
+  category    String
+  isPositive  Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
