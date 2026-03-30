@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 440" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="800" y2="440" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#e0f2fe"/>
+      <stop offset="100%" stop-color="#bae6fd"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="440" fill="url(#bg)"/>
+
+  <!-- Subtle grid dots -->
+  <g fill="#7dd3fc" opacity="0.35">
+    <circle cx="60" cy="60" r="3"/><circle cx="140" cy="60" r="3"/><circle cx="220" cy="60" r="3"/>
+    <circle cx="300" cy="60" r="3"/><circle cx="380" cy="60" r="3"/><circle cx="460" cy="60" r="3"/>
+    <circle cx="540" cy="60" r="3"/><circle cx="620" cy="60" r="3"/><circle cx="700" cy="60" r="3"/>
+    <circle cx="60" cy="140" r="3"/><circle cx="140" cy="140" r="3"/><circle cx="220" cy="140" r="3"/>
+    <circle cx="300" cy="140" r="3"/><circle cx="380" cy="140" r="3"/><circle cx="460" cy="140" r="3"/>
+    <circle cx="540" cy="140" r="3"/><circle cx="620" cy="140" r="3"/><circle cx="700" cy="140" r="3"/>
+    <circle cx="60" cy="300" r="3"/><circle cx="140" cy="300" r="3"/><circle cx="220" cy="300" r="3"/>
+    <circle cx="300" cy="300" r="3"/><circle cx="380" cy="300" r="3"/><circle cx="460" cy="300" r="3"/>
+    <circle cx="540" cy="300" r="3"/><circle cx="620" cy="300" r="3"/><circle cx="700" cy="300" r="3"/>
+    <circle cx="60" cy="380" r="3"/><circle cx="140" cy="380" r="3"/><circle cx="220" cy="380" r="3"/>
+    <circle cx="300" cy="380" r="3"/><circle cx="380" cy="380" r="3"/><circle cx="460" cy="380" r="3"/>
+    <circle cx="540" cy="380" r="3"/><circle cx="620" cy="380" r="3"/><circle cx="700" cy="380" r="3"/>
+  </g>
+
+  <!-- Atom orbits -->
+  <g transform="translate(400,220)" stroke="#0284c7" stroke-width="2" fill="none" opacity="0.7">
+    <ellipse rx="110" ry="40" transform="rotate(0)"/>
+    <ellipse rx="110" ry="40" transform="rotate(60)"/>
+    <ellipse rx="110" ry="40" transform="rotate(120)"/>
+  </g>
+  <!-- Nucleus -->
+  <circle cx="400" cy="220" r="18" fill="url(#accent)" opacity="0.9"/>
+  <!-- Electron dots -->
+  <circle cx="510" cy="220" r="7" fill="#0284c7" opacity="0.9"/>
+  <circle cx="345" cy="315" r="7" fill="#0284c7" opacity="0.9"/>
+  <circle cx="345" cy="125" r="7" fill="#0284c7" opacity="0.9"/>
+
+  <!-- Stars scattered -->
+  <g fill="#7dd3fc" opacity="0.6">
+    <polygon points="90,90 94,104 108,104 97,113 101,127 90,118 79,127 83,113 72,104 86,104" transform="scale(0.6) translate(60,60)"/>
+    <polygon points="660,340 663,350 673,350 665,356 668,366 660,360 652,366 655,356 647,350 657,350" transform="scale(0.5)"/>
+    <circle cx="680" cy="100" r="4"/><circle cx="120" cy="360" r="4"/>
+    <circle cx="150" cy="180" r="3"/><circle cx="650" cy="280" r="3"/>
+  </g>
+
+  <!-- Label -->
+  <text x="400" y="390" font-family="system-ui, sans-serif" font-size="18" font-weight="600" fill="#0369a1" text-anchor="middle" opacity="0.7">Science</text>
+</svg>

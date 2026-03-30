@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 440" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="800" y2="440" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ede9fe"/>
+      <stop offset="100%" stop-color="#ddd6fe"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="440" fill="url(#bg)"/>
+
+  <!-- Connection lines between people -->
+  <g stroke="#a78bfa" stroke-width="2" opacity="0.45" stroke-dasharray="6 4">
+    <line x1="400" y1="185" x2="240" y2="245"/>
+    <line x1="400" y1="185" x2="560" y2="245"/>
+    <line x1="240" y1="245" x2="310" y2="320"/>
+    <line x1="560" y1="245" x2="490" y2="320"/>
+    <line x1="240" y1="245" x2="560" y2="245"/>
+    <line x1="310" y1="320" x2="490" y2="320"/>
+  </g>
+
+  <!-- Center person -->
+  <circle cx="400" cy="148" r="26" fill="#7c3aed" opacity="0.85"/>
+  <path d="M365 215 Q400 195 435 215 L440 255 Q400 265 360 255 Z" fill="#7c3aed" opacity="0.7"/>
+
+  <!-- Left person -->
+  <circle cx="240" cy="208" r="20" fill="#8b5cf6" opacity="0.8"/>
+  <path d="M212 265 Q240 248 268 265 L272 298 Q240 306 208 298 Z" fill="#8b5cf6" opacity="0.65"/>
+
+  <!-- Right person -->
+  <circle cx="560" cy="208" r="20" fill="#8b5cf6" opacity="0.8"/>
+  <path d="M532 265 Q560 248 588 265 L592 298 Q560 306 528 298 Z" fill="#8b5cf6" opacity="0.65"/>
+
+  <!-- Bottom left person -->
+  <circle cx="310" cy="285" r="17" fill="#a78bfa" opacity="0.75"/>
+  <path d="M287 330 Q310 316 333 330 L336 358 Q310 365 284 358 Z" fill="#a78bfa" opacity="0.6"/>
+
+  <!-- Bottom right person -->
+  <circle cx="490" cy="285" r="17" fill="#a78bfa" opacity="0.75"/>
+  <path d="M467 330 Q490 316 513 330 L516 358 Q490 365 464 358 Z" fill="#a78bfa" opacity="0.6"/>
+
+  <!-- Decorative rings (community / globe feel) -->
+  <circle cx="400" cy="220" r="155" stroke="#c4b5fd" stroke-width="1.5" opacity="0.3" stroke-dasharray="8 6"/>
+  <circle cx="400" cy="220" r="200" stroke="#ddd6fe" stroke-width="1" opacity="0.25"/>
+
+  <!-- Small dots accents -->
+  <g fill="#7c3aed" opacity="0.25">
+    <circle cx="120" cy="100" r="5"/><circle cx="680" cy="100" r="5"/>
+    <circle cx="100" cy="360" r="5"/><circle cx="700" cy="360" r="5"/>
+    <circle cx="400" cy="50"  r="4"/><circle cx="400" cy="400" r="4"/>
+  </g>
+
+  <!-- Label -->
+  <text x="400" y="410" font-family="system-ui, sans-serif" font-size="18" font-weight="600" fill="#4c1d95" text-anchor="middle" opacity="0.7">Society</text>
+</svg>

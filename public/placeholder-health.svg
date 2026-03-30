@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 440" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="800" y2="440" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fff1f2"/>
+      <stop offset="100%" stop-color="#fecdd3"/>
+    </linearGradient>
+    <linearGradient id="heart" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fb7185"/>
+      <stop offset="100%" stop-color="#e11d48"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="440" fill="url(#bg)"/>
+
+  <!-- Soft radial glow behind heart -->
+  <circle cx="400" cy="210" r="160" fill="#fda4af" opacity="0.2"/>
+  <circle cx="400" cy="210" r="110" fill="#fb7185" opacity="0.12"/>
+
+  <!-- Heartbeat / ECG line -->
+  <polyline
+    points="60,220 180,220 210,220 230,155 255,280 278,220 320,220 400,220 430,220 455,145 480,295 505,220 550,220 740,220"
+    stroke="#fb7185" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"
+    fill="none" opacity="0.6"/>
+
+  <!-- Heart shape (path) -->
+  <path d="M400 295
+    C400 295 295 235 295 168
+    C295 135 322 112 355 112
+    C375 112 393 122 400 135
+    C407 122 425 112 445 112
+    C478 112 505 135 505 168
+    C505 235 400 295 400 295 Z"
+    fill="url(#heart)" opacity="0.88"/>
+
+  <!-- Inner highlight on heart -->
+  <path d="M370 150 C370 140 385 133 395 140" stroke="white" stroke-width="3" stroke-linecap="round" opacity="0.4"/>
+
+  <!-- Small floating hearts -->
+  <g opacity="0.35" fill="#fb7185">
+    <path d="M155 120 C155 120 130 105 130 88 C130 78 139 71 148 71 C152 71 156 74 158 78 C160 74 164 71 168 71 C177 71 186 78 186 88 C186 105 158 120 158 120 Z" transform="scale(0.7) translate(-50, 40)"/>
+    <path d="M155 120 C155 120 130 105 130 88 C130 78 139 71 148 71 C152 71 156 74 158 78 C160 74 164 71 168 71 C177 71 186 78 186 88 C186 105 158 120 158 120 Z" transform="scale(0.5) translate(870, 420)"/>
+    <path d="M155 120 C155 120 130 105 130 88 C130 78 139 71 148 71 C152 71 156 74 158 78 C160 74 164 71 168 71 C177 71 186 78 186 88 C186 105 158 120 158 120 Z" transform="scale(0.55) translate(740, 100)"/>
+  </g>
+
+  <!-- Decorative dots -->
+  <g fill="#fda4af" opacity="0.5">
+    <circle cx="100" cy="80" r="5"/><circle cx="120" cy="360" r="4"/>
+    <circle cx="680" cy="75" r="5"/><circle cx="700" cy="370" r="4"/>
+    <circle cx="200" cy="380" r="3"/><circle cx="600" cy="60"  r="3"/>
+  </g>
+
+  <!-- Label -->
+  <text x="400" y="400" font-family="system-ui, sans-serif" font-size="18" font-weight="600" fill="#9f1239" text-anchor="middle" opacity="0.7">Health</text>
+</svg>

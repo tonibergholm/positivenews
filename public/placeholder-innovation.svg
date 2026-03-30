@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 440" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="800" y2="440" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fffbeb"/>
+      <stop offset="100%" stop-color="#fde68a"/>
+    </linearGradient>
+    <linearGradient id="bulb" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fcd34d"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="440" fill="url(#bg)"/>
+
+  <!-- Radial glow -->
+  <circle cx="400" cy="195" r="170" fill="#fde68a" opacity="0.35"/>
+  <circle cx="400" cy="195" r="100" fill="#fcd34d" opacity="0.25"/>
+
+  <!-- Rays -->
+  <g stroke="#f59e0b" stroke-width="2" stroke-linecap="round" opacity="0.4">
+    <line x1="400" y1="60"  x2="400" y2="30"/>
+    <line x1="400" y1="330" x2="400" y2="360"/>
+    <line x1="260" y1="195" x2="230" y2="195"/>
+    <line x1="540" y1="195" x2="570" y2="195"/>
+    <line x1="301" y1="96"  x2="280" y2="75"/>
+    <line x1="499" y1="96"  x2="520" y2="75"/>
+    <line x1="301" y1="294" x2="280" y2="315"/>
+    <line x1="499" y1="294" x2="520" y2="315"/>
+  </g>
+
+  <!-- Bulb glass -->
+  <path d="M350 230
+    C320 205 310 175 318 148
+    C330 108 365 85 400 85
+    C435 85 470 108 482 148
+    C490 175 480 205 450 230
+    L450 260 Q450 270 440 270
+    L360 270 Q350 270 350 260 Z"
+    fill="url(#bulb)" opacity="0.9"/>
+
+  <!-- Filament inside bulb -->
+  <path d="M375 250 L375 230 Q390 210 400 225 Q410 210 425 230 L425 250"
+    stroke="#92400e" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.55"/>
+
+  <!-- Screw base bands -->
+  <rect x="355" y="270" width="90" height="10" rx="2" fill="#d97706" opacity="0.7"/>
+  <rect x="358" y="283" width="84" height="10" rx="2" fill="#d97706" opacity="0.6"/>
+  <rect x="362" y="296" width="76" height="10" rx="2" fill="#d97706" opacity="0.5"/>
+
+  <!-- Sparkles -->
+  <g fill="#f59e0b" opacity="0.55">
+    <!-- top-left sparkle -->
+    <polygon points="160,100 163,112 175,112 165,120 169,132 160,124 151,132 155,120 145,112 157,112"/>
+    <!-- top-right sparkle -->
+    <polygon points="640,80 643,91 654,91 645,98 648,109 640,102 632,109 635,98 626,91 637,91"/>
+    <!-- bottom-left -->
+    <circle cx="130" cy="330" r="5"/>
+    <circle cx="145" cy="315" r="3"/>
+    <!-- bottom-right -->
+    <circle cx="670" cy="340" r="5"/>
+    <circle cx="655" cy="325" r="3"/>
+  </g>
+
+  <!-- Floating small dots -->
+  <g fill="#fcd34d" opacity="0.45">
+    <circle cx="100" cy="180" r="4"/><circle cx="700" cy="170" r="4"/>
+    <circle cx="200" cy="60"  r="3"/><circle cx="600" cy="55"  r="3"/>
+    <circle cx="220" cy="380" r="3"/><circle cx="580" cy="375" r="3"/>
+  </g>
+
+  <!-- Label -->
+  <text x="400" y="400" font-family="system-ui, sans-serif" font-size="18" font-weight="600" fill="#92400e" text-anchor="middle" opacity="0.7">Innovation</text>
+</svg>
