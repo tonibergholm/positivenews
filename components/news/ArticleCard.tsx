@@ -129,7 +129,7 @@ export function ArticleCard({ article, onFlagged }: ArticleCardProps) {
             onClick={handleFlag}
             disabled={flagging}
             title="Not positive news"
-            className="absolute top-2 right-2 z-10 flex items-center justify-center size-7 rounded-full bg-black/40 text-white/80 opacity-0 group-hover:opacity-100 hover:bg-black/60 hover:text-white transition-all backdrop-blur-sm"
+            className="absolute top-2 right-2 z-10 flex items-center justify-center size-7 rounded-full bg-black/40 text-white/80 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-black/60 hover:text-white transition-all backdrop-blur-sm"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -156,9 +156,11 @@ export function ArticleCard({ article, onFlagged }: ArticleCardProps) {
             {article.title}
           </h2>
 
-          <p className="hidden sm:block text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-            {article.summary}
-          </p>
+          {article.summary && (
+            <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+              {article.summary}
+            </p>
+          )}
 
           <div className="mt-auto flex items-center justify-between pt-1.5 sm:pt-2 border-t border-border/60 text-[10px] sm:text-xs text-muted-foreground">
             <span className="font-medium truncate max-w-[60%]">

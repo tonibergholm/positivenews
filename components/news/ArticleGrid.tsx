@@ -71,7 +71,7 @@ export function ArticleGrid() {
       />
 
       {loading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
           {SKELETONS.map((i) => (
             <ArticleCardSkeleton key={i} />
           ))}
@@ -88,7 +88,7 @@ export function ArticleGrid() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
             {articles.map((article) => (
               <ArticleCard
                 key={article.id}
@@ -101,7 +101,7 @@ export function ArticleGrid() {
           </div>
 
           {loadingMore && (
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
               {[0, 1, 2, 3].map((i) => (
                 <ArticleCardSkeleton key={i} />
               ))}
