@@ -23,11 +23,20 @@ const NEGATIVE_STEMS_FI = [
   "maanjäri", "tsunami", "hurrikaa",
   // Victims
   "uhri",
-  // Irrelevant: sports scores
+  // Irrelevant: sports scores & roster moves
   "ottelu", "liiga", "valioliig", "veikkausliig",
-  "sarjataul", "playoff",
+  "sarjataul", "playoff", "siirtyy", "lähtee",
+  "sopimus", "jatkosopim",
   // Irrelevant: car/product reviews
   "koeajo", "pikatesti", "autotesti",
+  // Geopolitics & threats
+  "valtaamis", "pakottee", "uhkaa",
+  // Cost complaints
+  "kallistum", "hinnannous",
+  // Filler content
+  "ristikko", "miniristikko", "visailu",
+  // Administrative disputes
+  "kantelee", "oikeuskansleri",
 ];
 
 const NEGATIVE_WORDS_EN = [

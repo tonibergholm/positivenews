@@ -45,26 +45,32 @@ function buildPass1Prompt(articles: ArticleInput[]): string {
     })
     .join("\n");
 
-  return `You are a Positive News curator specializing in constructive journalism. Analyze these articles and return JSON.
+  return `You are a STRICT Positive News curator. Your job is to ONLY let through news that makes a reader feel inspired, hopeful, or calm. When in doubt, REJECT.
 
-INCLUDE (positive = true):
-- Solutions journalism: people or organizations solving real problems
+INCLUDE (positive = true) — ONLY these:
+- Solutions journalism: people or organizations actively solving real problems
 - Scientific breakthroughs: medicine, space, green energy, technology that benefits humanity
 - Acts of kindness: heroism, community support, altruism
 - Environmental recovery: wildlife rebounding, reforestation, climate goals met
-- Cultural/sports triumphs: uplifting achievements focusing on the human spirit
+- Cultural/sports triumphs: uplifting ACHIEVEMENTS (winning, records, overcoming adversity) — NOT roster moves, transfers, or retirements
 - Finnish specifics: "sisu" stories, community successes, innovations, nature conservation
-- Practical wellness: health tips, well-being advice
+- Practical wellness: health tips, well-being advice that helps people
 
-EXCLUDE (positive = false):
-- War, violent crime, political bickering
+EXCLUDE (positive = false) — be aggressive here:
+- ANY mention of war, military threats, geopolitics, territorial disputes, or sanctions
+- ANY mention of Trump, Putin, or other politicians in conflict/threat context
+- Violent crime, political bickering, government disputes, legal complaints
 - Rage-bait, scandals, celebrity gossip
 - Alarmist headlines (even if story is neutral)
 - Tragic accidents (even with a silver lining)
-- Toxic positivity that dismisses real suffering
-- Opinion pieces and columns about societal problems
+- Opinion pieces, columns, editorials about societal problems
 - Error reports, corrections, failures
+- Sports roster moves, transfers, coaching changes, retirements (NOT triumphs)
 - Sports scores, doping, league standings
+- Rising costs, price complaints, inflation stories ("X now costs more")
+- Crossword puzzles, quizzes, games, entertainment filler — NOT news
+- Administrative/bureaucratic disputes (e.g. regions filing complaints)
+- Generic product news, consumer reviews
 
 Return ONLY this JSON: {"results": [{"id": "...", "positive": true/false, "reason": "brief reason"}]}
 
@@ -80,23 +86,30 @@ function buildPass2Prompt(articles: ArticleInput[]): string {
     })
     .join("\n");
 
-  return `You are a strict Positive News quality filter. These articles already passed an initial positivity check. Apply a STRICTER filter.
+  return `You are the FINAL quality gate for a Positive News feed. These articles already passed an initial check. Apply the STRICTEST filter. When in doubt, REJECT.
 
-KEEP articles that are:
+Ask yourself: "Would this make someone smile, feel hopeful, or learn something good?" If not, reject it.
+
+KEEP ONLY articles that are:
 - Genuinely uplifting: real human achievement, community success, scientific progress
 - Helpful to people: practical wellness, health breakthroughs, solutions to real problems
 - Something to be proud of: innovation that helps humanity, environmental wins, acts of kindness
-- Good business news IF it directly benefits people (jobs, clean energy, accessibility)
+- Good business news ONLY IF it directly creates jobs, clean energy, or accessibility for people
 
-REJECT articles that are:
+REJECT everything else, including:
 - Marketing disguised as news (product launches, brand collaborations, celebrity collections)
-- Generic business deals with no clear human benefit
-- Business thought-leader puff pieces ("insights from CEO X")
-- Environmental LOSS stories (losing ecosystems is NOT positive)
-- Stories about errors, failures, or corrections
-- Consumer product reviews or upgrades
+- Generic business deals, contracts, or corporate transactions
+- Business thought-leader puff pieces ("insights from CEO X", "future of business")
+- Environmental LOSS or alarm stories (losing ecosystems is NOT positive)
+- Stories about errors, failures, corrections, or things getting worse
+- Consumer product reviews, upgrades, or "best of" roundups
 - Clickbait listicles with no real substance
-- Generic "tips" articles that are just content filler
+- Crossword puzzles, quizzes, games, horoscopes — not news
+- Sports personnel changes (coaching moves, transfers, retirements) — only TRIUMPHS count
+- Rising costs, price increases, affordability complaints
+- Political threats, sanctions, military posturing even if framed neutrally
+- Administrative disputes, legal complaints, bureaucratic problems
+- Filler content that is not actually news (puzzles, opinion polls, Q&A columns)
 
 Return ONLY this JSON: {"results": [{"id": "...", "keep": true/false, "reason": "brief reason"}]}
 
