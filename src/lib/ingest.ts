@@ -84,7 +84,7 @@ async function ingestFeed(feed: FeedSource): Promise<number> {
 
       const isPositive = feed.trusted
         ? true
-        : await classifyPositive(title, summary, feed.language);
+        : classifyPositive(title, summary, feed.language);
 
       await prisma.article.create({
         data: {

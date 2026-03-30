@@ -1,7 +1,7 @@
 /**
- * Retroactively classifies all existing articles using the local Ollama model.
+ * Retroactively classifies all existing articles using keyword-based filter.
  * - Trusted sources (curated positive outlets) are skipped — kept as positive.
- * - General sources are classified; articles deemed negative get isPositive=false.
+ * - General sources are classified; articles matching negative keywords get isPositive=false.
  * - Safe to re-run.
  *
  * Usage: npx tsx scripts/backfill-classify.ts
@@ -11,9 +11,8 @@ import { prisma } from "../src/lib/prisma";
 import { classifyPositive } from "../src/lib/classifier";
 import { FEED_SOURCES } from "../src/config/sources";
 
-const BATCH_SIZE = 50;
+const BATCH_SIZE = 100;
 
-// Build lookup: source name → { trusted, language }
 const sourceInfo = new Map(
   FEED_SOURCES.map((s) => [s.name, { trusted: s.trusted ?? false, language: s.language }])
 );
@@ -21,8 +20,6 @@ const sourceInfo = new Map(
 async function main() {
   const total = await prisma.article.count();
   console.log(`[backfill] ${total} articles in DB`);
-  console.log(`[backfill] Model: ${process.env.OLLAMA_MODEL ?? "llama3.2:1b"}`);
-  console.log();
 
   const trustedNames = FEED_SOURCES.filter((s) => s.trusted).map((s) => s.name);
   console.log(`[backfill] Trusted sources (skipped): ${trustedNames.join(", ")}`);
@@ -48,6 +45,8 @@ async function main() {
 
     if (batch.length === 0) break;
 
+    const updates: string[] = [];
+
     for (const article of batch) {
       const info = sourceInfo.get(article.source.name);
       const trusted = info?.trusted ?? false;
@@ -55,28 +54,28 @@ async function main() {
 
       if (trusted) {
         skipped++;
-        processed++;
-        continue;
+      } else {
+        const isPositive = classifyPositive(article.title, article.summary, language);
+        if (!isPositive) {
+          updates.push(article.id);
+          rejected++;
+        }
       }
-
-      const isPositive = await classifyPositive(article.title, article.summary, language);
-
-      if (!isPositive) {
-        await prisma.article.update({
-          where: { id: article.id },
-          data: { isPositive: false },
-        });
-        rejected++;
-      }
-
       processed++;
-      if (processed % 50 === 0 || processed === total) {
-        const pct = ((processed / total) * 100).toFixed(1);
-        console.log(
-          `[backfill] ${processed}/${total} (${pct}%) — rejected: ${rejected}, trusted-skipped: ${skipped}`
-        );
-      }
     }
+
+    // Batch update all rejected articles
+    if (updates.length > 0) {
+      await prisma.article.updateMany({
+        where: { id: { in: updates } },
+        data: { isPositive: false },
+      });
+    }
+
+    const pct = ((processed / total) * 100).toFixed(1);
+    console.log(
+      `[backfill] ${processed}/${total} (${pct}%) — rejected: ${rejected}, trusted-skipped: ${skipped}`
+    );
 
     offset += BATCH_SIZE;
   }
@@ -85,7 +84,7 @@ async function main() {
   console.log(`[backfill] Done.`);
   console.log(`  Total processed        : ${processed}`);
   console.log(`  Trusted (auto-positive): ${skipped}`);
-  console.log(`  Classified by LLM      : ${processed - skipped}`);
+  console.log(`  Classified             : ${processed - skipped}`);
   console.log(`  Rejected (negative)    : ${rejected}`);
   console.log(`  Kept (positive)        : ${processed - skipped - rejected}`);
 
