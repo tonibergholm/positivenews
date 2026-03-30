@@ -1,5 +1,6 @@
 import Parser from "rss-parser";
 import { prisma } from "./prisma";
+import { classifyPositive } from "./classifier";
 import { FEED_SOURCES, type FeedSource } from "@/src/config/sources";
 
 const parser = new Parser({
@@ -75,10 +76,16 @@ async function ingestFeed(feed: FeedSource): Promise<number> {
     const imageUrl = extractImageUrl(item as Parser.Item & Record<string, unknown>);
 
     try {
-      await prisma.article.upsert({
+      const exists = await prisma.article.findUnique({
         where: { url },
-        update: {},
-        create: {
+        select: { id: true },
+      });
+      if (exists) continue;
+
+      const isPositive = await classifyPositive(title, summary);
+
+      await prisma.article.create({
+        data: {
           title,
           url,
           summary,
@@ -86,12 +93,12 @@ async function ingestFeed(feed: FeedSource): Promise<number> {
           publishedAt,
           sourceId,
           category: feed.category,
-          isPositive: true,
+          isPositive,
         },
       });
       saved++;
     } catch {
-      // duplicate or constraint — skip silently
+      // constraint violation — skip silently
     }
   }
 
