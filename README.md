@@ -2,8 +2,6 @@
 
 A positive news aggregator that collects articles from 23 RSS feeds (English and Finnish), filters out negative content, and presents an uplifting reading experience. Users can flag articles that slip through, teaching the system to improve over time.
 
-**Live:** [bergholm.net/news](https://bergholm.net/news)
-
 ## How it works
 
 ```
@@ -178,13 +176,13 @@ Flags an article as not positive. Rate limited to 10 requests per IP per minute.
 Triggers a manual feed ingestion. Requires `x-ingest-secret` header.
 
 ```bash
-curl -X POST https://bergholm.net/news/api/ingest \
+curl -X POST https://your-domain.com/news/api/ingest \
   -H "x-ingest-secret: $INGEST_SECRET"
 ```
 
 ## Production deployment
 
-The app runs on Ubuntu 24.04 behind nginx as a reverse proxy:
+The app is designed to run behind nginx as a reverse proxy:
 
 ```
 Client --> nginx (SSL, /news) --> PM2 (port 3001) --> Next.js
@@ -193,13 +191,12 @@ Client --> nginx (SSL, /news) --> PM2 (port 3001) --> Next.js
 Deploy updates:
 
 ```bash
-ssh -p 2222 toni@bergholm.net \
-  "cd /home/toni/apps/positivenews && \
-   git pull && \
-   pnpm install --frozen-lockfile && \
-   npx prisma migrate deploy && \
-   pnpm build && \
-   pm2 restart positivenews --update-env"
+cd /path/to/positivenews && \
+  git pull && \
+  pnpm install --frozen-lockfile && \
+  npx prisma migrate deploy && \
+  pnpm build && \
+  pm2 restart positivenews --update-env
 ```
 
 ## Database schema
