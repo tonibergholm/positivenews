@@ -17,7 +17,12 @@
       "Bash(git commit:*)",
       "Bash(npx tsx:*)",
       "Bash(npx prisma:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(find node_modules/next/dist/docs/ -name *font* -o -name *Font*)",
+      "Bash(B=~/.claude/skills/gstack/browse/dist/browse $B goto \"https://bergholm.net/news\")",
+      "Read(//Users/toni/Developer/Omat/PositiveNews/**)",
+      "Bash(1 $B eval \"document.documentElement.style.setProperty\\(''''--viewport'''', ''''390px''''\\)\" 2)",
+      "Bash(1 sleep:*)"
     ]
   }
 }
