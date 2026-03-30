@@ -121,6 +121,48 @@ export const FEED_SOURCES: FeedSource[] = [
     category: "Society",
     language: "fi",
   },
+  {
+    name: "Yle Kulttuuri",
+    url: "https://feeds.yle.fi/uutiset/v1/recent.rss?publisherIds=YLE_UUTISET&concepts=18-35128",
+    category: "Society",
+    language: "fi",
+  },
+  {
+    name: "Yle Ulkomaat",
+    url: "https://feeds.yle.fi/uutiset/v1/recent.rss?publisherIds=YLE_UUTISET&concepts=18-34953",
+    category: "Society",
+    language: "fi",
+  },
+  {
+    name: "Helsingin Sanomat",
+    url: "https://www.hs.fi/rss/tuoreimmat.xml",
+    category: "Society",
+    language: "fi",
+  },
+  {
+    name: "Ilta-Sanomat – Tiede",
+    url: "https://www.is.fi/rss/tiede.xml",
+    category: "Science",
+    language: "fi",
+  },
+  {
+    name: "Ilta-Sanomat – Terveys",
+    url: "https://www.is.fi/rss/terveys.xml",
+    category: "Health",
+    language: "fi",
+  },
+  {
+    name: "Tekniikka&Talous",
+    url: "https://www.tekniikkatalous.fi/api/feed/v2/rss/tt",
+    category: "Innovation",
+    language: "fi",
+  },
+  {
+    name: "Tivi",
+    url: "https://www.tivi.fi/api/feed/v2/rss/tv",
+    category: "Innovation",
+    language: "fi",
+  },
 ];
 
 export const CATEGORIES: Category[] = [
