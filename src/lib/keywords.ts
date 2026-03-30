@@ -30,6 +30,6 @@ export function extractKeywords(title: string, language: string): string[] {
     .split(/\s+/)
     .filter((t) => t.length >= 4 && !stopWords.has(t));
 
-  // Deduplicate
-  return [...new Set(tokens)];
+  // Deduplicate and cap to prevent keyword table pollution
+  return [...new Set(tokens)].slice(0, 20);
 }

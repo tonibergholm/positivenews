@@ -58,9 +58,15 @@ async function ingestFeed(feed: FeedSource): Promise<number> {
   let saved = 0;
 
   for (const item of parsed.items ?? []) {
-    const url = item.link ?? item.guid;
+    const rawUrl = item.link ?? item.guid;
     const title = item.title;
-    if (!url || !title) continue;
+    if (!rawUrl || !title) continue;
+
+    // Only allow http/https URLs to block data: and javascript: injection
+    if (!rawUrl.startsWith("https://") && !rawUrl.startsWith("http://")) continue;
+
+    const url = rawUrl.slice(0, 2048);
+    const safeTitle = title.slice(0, 500);
 
     const publishedAt = item.isoDate
       ? new Date(item.isoDate)
@@ -73,7 +79,8 @@ async function ingestFeed(feed: FeedSource): Promise<number> {
       item.summary?.slice(0, 500) ??
       null;
 
-    const imageUrl = extractImageUrl(item as Parser.Item & Record<string, unknown>);
+    const rawImageUrl = extractImageUrl(item as Parser.Item & Record<string, unknown>);
+    const imageUrl = rawImageUrl ? rawImageUrl.slice(0, 2048) : null;
 
     try {
       const exists = await prisma.article.findUnique({
@@ -84,11 +91,11 @@ async function ingestFeed(feed: FeedSource): Promise<number> {
 
       const isPositive = feed.trusted
         ? true
-        : await classifyPositive(title, summary, feed.language);
+        : await classifyPositive(safeTitle, summary, feed.language);
 
       await prisma.article.create({
         data: {
-          title,
+          title: safeTitle,
           url,
           summary,
           imageUrl,
@@ -110,19 +117,23 @@ async function ingestFeed(feed: FeedSource): Promise<number> {
 
 export async function ingestAll(): Promise<{ total: number; errors: string[] }> {
   const errors: string[] = [];
-  let total = 0;
 
   const activeSources = FEED_SOURCES.filter(() => true); // all active
 
-  await Promise.allSettled(
+  const results = await Promise.allSettled(
     activeSources.map(async (feed) => {
       try {
-        const count = await ingestFeed(feed);
-        total += count;
+        return await ingestFeed(feed);
       } catch (err) {
         errors.push(`${feed.name}: ${err}`);
+        return 0;
       }
     })
+  );
+
+  const total = results.reduce(
+    (acc, r) => acc + (r.status === "fulfilled" ? r.value : 0),
+    0
   );
 
   console.log(`[ingest] Done — ${total} articles ingested`);
