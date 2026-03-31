@@ -46,6 +46,12 @@ const NEGATIVE_STEMS_FI = [
   "peruuntu",
   // Business clickbait
   "epäonnistu",
+  // Layoffs
+  "irtisano", "yt-neuvottel",
+  // Court/sentencing
+  "tuomio", "tuomits", "tuomittu",
+  // Animal attacks
+  "puri",
 ];
 
 const NEGATIVE_WORDS_EN = [

@@ -107,6 +107,9 @@ REJECT everything else, including:
 - Generic business deals, contracts, or corporate transactions
 - Business thought-leader puff pieces ("insights from CEO X", "future of business")
 - Entrepreneurship clickbait ("dare to start", "how companies fail/succeed in X")
+- Layoffs, firings, job cuts, restructuring
+- Court verdicts, criminal convictions, sentencing (even of public figures)
+- Animal attacks, bites, maulings
 - Environmental LOSS, alarm, or wildlife CRIME stories (illegal trade, poaching)
 - Stories about errors, failures, corrections, or things getting worse
 - Consumer product reviews, upgrades, or "best of" roundups
@@ -119,6 +122,9 @@ REJECT everything else, including:
 - Administrative disputes, legal complaints, bureaucratic problems
 - Health scares: anti-vaccination trends, disease outbreaks, declining health stats
 - Cancelled events, illness/health of politicians
+- Layoffs, firings, job cuts, restructuring — people losing their jobs is not positive
+- Court verdicts, criminal convictions, sentencing
+- Animal attacks on people
 - Filler content that is not actually news (puzzles, opinion polls, Q&A columns)
 
 Return ONLY this JSON: {"results": [{"id": "...", "keep": true/false, "reason": "brief reason"}]}
