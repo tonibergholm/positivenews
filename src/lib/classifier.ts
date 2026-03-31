@@ -23,20 +23,29 @@ const NEGATIVE_STEMS_FI = [
   "maanjäri", "tsunami", "hurrikaa",
   // Victims
   "uhri",
-  // Irrelevant: sports scores & roster moves
+  // Irrelevant: sports scores, roster moves & lawsuits
   "ottelu", "liiga", "valioliig", "veikkausliig",
   "sarjataul", "playoff", "siirtyy", "lähtee",
-  "sopimus", "jatkosopim",
+  "sopimus", "jatkosopim", "haastett", "oikeuteen",
+  "murskasi", "nhl",
   // Irrelevant: car/product reviews
   "koeajo", "pikatesti", "autotesti",
+  // Drones & military
+  "drooni", "droone", "hävittäj", "ilmatil",
   // Geopolitics & threats
-  "valtaamis", "pakottee", "uhkaa",
-  // Cost complaints
-  "kallistum", "hinnannous",
+  "valtaamis", "pakottee", "uhkaa", "trump",
+  // Cost complaints & insurance
+  "kallistum", "hinnannous", "kallistui", "vakuutus",
+  "vesivahin",
+  // Health alarms
+  "rokottam",
   // Filler content
   "ristikko", "miniristikko", "visailu",
-  // Administrative disputes
-  "kantelee", "oikeuskansleri",
+  // Administrative disputes & politics
+  "kantelee", "oikeuskansleri", "virusinfekt",
+  "peruuntu",
+  // Business clickbait
+  "epäonnistu",
 ];
 
 const NEGATIVE_WORDS_EN = [
@@ -53,9 +62,18 @@ const NEGATIVE_WORDS_EN = [
   "flood", "wildfire", "explosion", "devastat",
   // Irrelevant: sports scores
   "scores", "standings", "playoff", "halftime",
-  "relegation", "matchday",
-  // Irrelevant: reviews
+  "relegation", "matchday", "crushed", "thrashed",
+  // Irrelevant: reviews & sales
   "test-drive", "hands-on-review",
+  "sale", "blowing-out", "deal-of",
+  // Wildlife crime / environmental loss
+  "illegal-wildlife", "illegal-trade", "poaching",
+  // Drones & military
+  "drone", "drones", "fighter-jet",
+  // Geopolitics
+  "trump", "sanctions", "invade", "invasion",
+  // Business clickbait
+  "fail", "fails", "failing",
 ];
 
 // ── Positive override stems ─────────────────────────────────────────

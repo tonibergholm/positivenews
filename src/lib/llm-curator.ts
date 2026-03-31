@@ -57,20 +57,26 @@ INCLUDE (positive = true) — ONLY these:
 - Practical wellness: health tips, well-being advice that helps people
 
 EXCLUDE (positive = false) — be aggressive here:
-- ANY mention of war, military threats, geopolitics, territorial disputes, or sanctions
+- ANY mention of war, military threats, geopolitics, territorial disputes, sanctions, or drones/missiles
 - ANY mention of Trump, Putin, or other politicians in conflict/threat context
+- ANY military activity: fighter jets, air space violations, defense exercises
 - Violent crime, political bickering, government disputes, legal complaints
 - Rage-bait, scandals, celebrity gossip
 - Alarmist headlines (even if story is neutral)
-- Tragic accidents (even with a silver lining)
+- Tragic accidents, water damage, insurance disputes (even with a silver lining)
 - Opinion pieces, columns, editorials about societal problems
 - Error reports, corrections, failures
-- Sports roster moves, transfers, coaching changes, retirements (NOT triumphs)
-- Sports scores, doping, league standings
-- Rising costs, price complaints, inflation stories ("X now costs more")
+- Health ALARM stories: declining vaccination rates, disease outbreaks, pandemic fears
+- Sports roster moves, transfers, coaching changes, retirements, lawsuits (NOT triumphs)
+- Sports scores, doping, league standings, match results ("crushed", "thrashed")
+- Rising costs, price complaints, inflation stories ("X now costs more", "kallistui")
 - Crossword puzzles, quizzes, games, entertainment filler — NOT news
-- Administrative/bureaucratic disputes (e.g. regions filing complaints)
-- Generic product news, consumer reviews
+- Administrative/bureaucratic disputes (e.g. regions filing complaints to chancellor)
+- Generic product news, consumer reviews, Amazon sales, shopping deals
+- Product/shopping sales and promotions ("spring sale", "blowing out", "deal of the day")
+- Cancelled visits, illness of politicians or public figures
+- Entrepreneurship clickbait ("why you should start a business", "how companies fail")
+- Wildlife CRIME or illegal trade stories (poaching, smuggling) — these are negative, not environmental wins
 
 Return ONLY this JSON: {"results": [{"id": "...", "positive": true/false, "reason": "brief reason"}]}
 
@@ -100,15 +106,19 @@ REJECT everything else, including:
 - Marketing disguised as news (product launches, brand collaborations, celebrity collections)
 - Generic business deals, contracts, or corporate transactions
 - Business thought-leader puff pieces ("insights from CEO X", "future of business")
-- Environmental LOSS or alarm stories (losing ecosystems is NOT positive)
+- Entrepreneurship clickbait ("dare to start", "how companies fail/succeed in X")
+- Environmental LOSS, alarm, or wildlife CRIME stories (illegal trade, poaching)
 - Stories about errors, failures, corrections, or things getting worse
 - Consumer product reviews, upgrades, or "best of" roundups
+- Shopping sales and promotions ("spring sale", Amazon deals, "best price")
 - Clickbait listicles with no real substance
 - Crossword puzzles, quizzes, games, horoscopes — not news
-- Sports personnel changes (coaching moves, transfers, retirements) — only TRIUMPHS count
-- Rising costs, price increases, affordability complaints
-- Political threats, sanctions, military posturing even if framed neutrally
+- Sports personnel changes, lawsuits, match results — only genuine TRIUMPHS count
+- Rising costs, price increases, affordability complaints, insurance disputes
+- Political threats, sanctions, military activity, drone incidents
 - Administrative disputes, legal complaints, bureaucratic problems
+- Health scares: anti-vaccination trends, disease outbreaks, declining health stats
+- Cancelled events, illness/health of politicians
 - Filler content that is not actually news (puzzles, opinion polls, Q&A columns)
 
 Return ONLY this JSON: {"results": [{"id": "...", "keep": true/false, "reason": "brief reason"}]}
