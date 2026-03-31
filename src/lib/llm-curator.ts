@@ -107,9 +107,18 @@ REJECT everything else, including:
 - Generic business deals, contracts, or corporate transactions
 - Business thought-leader puff pieces ("insights from CEO X", "future of business")
 - Entrepreneurship clickbait ("dare to start", "how companies fail/succeed in X")
+- CEO interview roundups, "here's what they said" puff pieces
 - Layoffs, firings, job cuts, restructuring
-- Court verdicts, criminal convictions, sentencing (even of public figures)
+- Labor disputes, strikes, union conflicts without resolution
+- Court verdicts, criminal convictions, sentencing, discrimination lawsuits
+- Police investigations, data breaches, leaked personal data
 - Animal attacks, bites, maulings
+- Inflation reports, economic downturns, cost-of-living alarm
+- Constitutional/privacy law debates, governance criticism
+- Sports misconduct investigations, doping probes
+- Dangerous roads, safety hazards, infrastructure failures
+- Tech platform problems (spam, abuse, outages)
+- Conflict of interest stories, cronyism
 - Environmental LOSS, alarm, or wildlife CRIME stories (illegal trade, poaching)
 - Stories about errors, failures, corrections, or things getting worse
 - Consumer product reviews, upgrades, or "best of" roundups
@@ -123,8 +132,18 @@ REJECT everything else, including:
 - Health scares: anti-vaccination trends, disease outbreaks, declining health stats
 - Cancelled events, illness/health of politicians
 - Layoffs, firings, job cuts, restructuring — people losing their jobs is not positive
-- Court verdicts, criminal convictions, sentencing
+- Labor disputes, strikes without resolution
+- Court verdicts, criminal convictions, sentencing, discrimination cases
+- Police investigations, data breaches, security incidents
 - Animal attacks on people
+- Inflation, economic alarm, cost-of-living stories
+- Constitutional/privacy debates, governance criticism
+- Sports investigations, misconduct probes
+- Infrastructure dangers, safety hazards
+- Tech platform spam, abuse, outages
+- Conflict of interest, cronyism, appointments of insiders
+- "Your X is ugly / broken, this company wants to fix it" — product marketing
+- CEO interview compilations, "what leaders said" roundups
 - Filler content that is not actually news (puzzles, opinion polls, Q&A columns)
 
 Return ONLY this JSON: {"results": [{"id": "...", "keep": true/false, "reason": "brief reason"}]}

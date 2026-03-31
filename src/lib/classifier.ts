@@ -48,10 +48,21 @@ const NEGATIVE_STEMS_FI = [
   "epäonnistu",
   // Layoffs
   "irtisano", "yt-neuvottel",
-  // Court/sentencing
-  "tuomio", "tuomits", "tuomittu",
+  // Court/sentencing/crime
+  "tuomio", "tuomits", "tuomittu", "syyte", "syrjin",
+  "esitutkint", "tietovuod",
   // Animal attacks
   "puri",
+  // Labor disputes
+  "työriid", "lakko",
+  // Inflation & economy
+  "inflaatio", "suhdanne",
+  // Constitutional/privacy politics
+  "perustuslai", "perusoikeu",
+  // Sports investigations
+  "tutkinnan",
+  // Danger/hazard
+  "hengenvaar",
 ];
 
 const NEGATIVE_WORDS_EN = [
@@ -69,17 +80,27 @@ const NEGATIVE_WORDS_EN = [
   // Irrelevant: sports scores
   "scores", "standings", "playoff", "halftime",
   "relegation", "matchday", "crushed", "thrashed",
+  "fatigue", "sportsball",
   // Irrelevant: reviews & sales
   "test-drive", "hands-on-review",
   "sale", "blowing-out", "deal-of",
+  // Product marketing
+  "ugly", "wants-to-fix",
   // Wildlife crime / environmental loss
   "illegal-wildlife", "illegal-trade", "poaching",
   // Drones & military
   "drone", "drones", "fighter-jet",
   // Geopolitics
   "trump", "sanctions", "invade", "invasion",
-  // Business clickbait
+  // Business clickbait / CEO puff
   "fail", "fails", "failing",
+  "interviewed-the-ceos", "here-is-what-they-said",
+  // Data breaches / investigations
+  "data-breach", "investigation",
+  // Inflation
+  "inflation",
+  // Discrimination
+  "discrimination", "hate-crime",
 ];
 
 // ── Positive override stems ─────────────────────────────────────────
