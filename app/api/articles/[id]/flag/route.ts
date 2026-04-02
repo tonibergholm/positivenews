@@ -85,7 +85,11 @@ export async function POST(
     });
   });
 
-  await redis.del(`learned:keywords:${language}`);
+  try {
+    await redis.del(`learned:keywords:${language}`);
+  } catch (err) {
+    console.error("[flag] Redis cache invalidation failed:", err);
+  }
 
   return NextResponse.json({ success: true });
 }
