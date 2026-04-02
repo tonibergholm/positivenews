@@ -76,31 +76,48 @@ const NEGATIVE_WORDS_EN = [
   "terrorist", "terrorism", "attack", "war",
   // Disasters
   "crash", "crashed", "earthquake", "tsunami", "hurricane",
-  "flood", "wildfire", "explosion", "devastat",
+  "flood", "wildfire", "explosion",
   // Irrelevant: sports scores
   "scores", "standings", "playoff", "halftime",
   "relegation", "matchday", "crushed", "thrashed",
   "fatigue", "sportsball",
   // Irrelevant: reviews & sales
-  "test-drive", "hands-on-review",
-  "sale", "blowing-out", "deal-of",
+  "test-drive", "sale",
   // Product marketing
-  "ugly", "wants-to-fix",
+  "ugly",
   // Wildlife crime / environmental loss
-  "illegal-wildlife", "illegal-trade", "poaching",
+  "poaching",
   // Drones & military
-  "drone", "drones", "fighter-jet",
+  "drone", "drones",
   // Geopolitics
-  "trump", "sanctions", "invade", "invasion",
+  "trump", "sanctions", "invasion",
   // Business clickbait / CEO puff
   "fail", "fails", "failing",
-  "interviewed-the-ceos", "here-is-what-they-said",
   // Data breaches / investigations
-  "data-breach", "investigation",
+  "investigation",
   // Inflation
   "inflation",
   // Discrimination
-  "discrimination", "hate-crime",
+  "discrimination",
+];
+
+const NEGATIVE_PREFIXES_EN = [
+  "devastat",
+  "invade",
+];
+
+const NEGATIVE_PHRASES_EN = [
+  "blowing out",
+  "data breach",
+  "deal of the day",
+  "fighter jet",
+  "hands on review",
+  "hate crime",
+  "here is what they said",
+  "illegal trade",
+  "illegal wildlife",
+  "interviewed the ceos",
+  "wants to fix",
 ];
 
 // ── Positive override stems ─────────────────────────────────────────
@@ -160,6 +177,14 @@ function tokenize(text: string): string[] {
     .filter((t) => t.length > 2);
 }
 
+function normalizeText(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function stemMatch(tokens: string[], stems: string[], useIncludes: boolean): number {
   let hits = 0;
   for (const token of tokens) {
@@ -171,6 +196,36 @@ function stemMatch(tokens: string[], stems: string[], useIncludes: boolean): num
     }
   }
   return hits;
+}
+
+function exactMatch(tokens: string[], words: string[]): number {
+  const tokenSet = new Set(tokens);
+  let hits = 0;
+
+  for (const word of words) {
+    if (tokenSet.has(word)) hits++;
+  }
+
+  return hits;
+}
+
+function phraseMatch(text: string, phrases: string[]): number {
+  let hits = 0;
+
+  for (const phrase of phrases) {
+    if (text.includes(phrase)) hits++;
+  }
+
+  return hits;
+}
+
+function negativeHitsEnglish(tokens: string[], text: string, learned: string[]): number {
+  return (
+    exactMatch(tokens, NEGATIVE_WORDS_EN) +
+    stemMatch(tokens, NEGATIVE_PREFIXES_EN, false) +
+    phraseMatch(text, NEGATIVE_PHRASES_EN) +
+    exactMatch(tokens, learned)
+  );
 }
 
 // ── Public API ──────────────────────────────────────────────────────
@@ -187,16 +242,15 @@ export async function classifyPositive(
     : title;
 
   const tokens = tokenize(text);
+  const normalizedText = normalizeText(text);
   const isFinnish = language === "fi";
 
-  const builtInNeg = isFinnish ? NEGATIVE_STEMS_FI : NEGATIVE_WORDS_EN;
   const posStemsList = isFinnish ? POSITIVE_OVERRIDES_FI : POSITIVE_OVERRIDES_EN;
   const learned = await getLearnedKeywords(language);
 
-  // Merge built-in + learned keywords
-  const allNegative = [...builtInNeg, ...learned];
-
-  const negHits = stemMatch(tokens, allNegative, isFinnish);
+  const negHits = isFinnish
+    ? stemMatch(tokens, [...NEGATIVE_STEMS_FI, ...learned], true)
+    : negativeHitsEnglish(tokens, normalizedText, learned);
   const posHits = stemMatch(tokens, posStemsList, isFinnish);
 
   // Positive overrides negative when both present
@@ -218,9 +272,12 @@ export function classifyPositiveSync(
     : title;
 
   const tokens = tokenize(text);
+  const normalizedText = normalizeText(text);
   const isFinnish = language === "fi";
 
-  const negHits = stemMatch(tokens, isFinnish ? NEGATIVE_STEMS_FI : NEGATIVE_WORDS_EN, isFinnish);
+  const negHits = isFinnish
+    ? stemMatch(tokens, NEGATIVE_STEMS_FI, true)
+    : negativeHitsEnglish(tokens, normalizedText, []);
   const posHits = stemMatch(tokens, isFinnish ? POSITIVE_OVERRIDES_FI : POSITIVE_OVERRIDES_EN, isFinnish);
 
   if (posHits > 0 && negHits <= posHits) return true;
