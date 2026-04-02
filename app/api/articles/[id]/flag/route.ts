@@ -44,41 +44,45 @@ export async function POST(
     return NextResponse.json({ error: "Article not found" }, { status: 404 });
   }
 
-  // Mark article as not positive
-  await prisma.article.update({
-    where: { id },
-    data: { isPositive: false, flaggedAt: new Date() },
-  });
+  if (article.flaggedAt) {
+    return NextResponse.json({ success: true, duplicate: true });
+  }
 
   // Extract keywords and upsert into learned keywords
   const language = article.source.language;
   const keywords = extractKeywords(article.title, language);
 
-  if (keywords.length > 0) {
-    await prisma.$transaction(async (tx) => {
-      for (const keyword of keywords) {
-        await tx.learnedKeyword.upsert({
-          where: {
-            keyword_language: { keyword, language },
-          },
-          update: {
-            hits: { increment: 1 },
-          },
-          create: { keyword, language, hits: 1, active: false },
-        });
-      }
-
-      await tx.learnedKeyword.updateMany({
-        where: {
-          keyword: { in: keywords },
-          language,
-          hits: { gte: ACTIVATION_THRESHOLD },
-          active: false,
-        },
-        data: { active: true },
-      });
+  await prisma.$transaction(async (tx) => {
+    const result = await tx.article.updateMany({
+      where: { id, flaggedAt: null },
+      data: { isPositive: false, flaggedAt: new Date() },
     });
-  }
+
+    // Another request flagged this article first. Treat the operation as idempotent.
+    if (result.count === 0 || keywords.length === 0) return;
+
+    for (const keyword of keywords) {
+      await tx.learnedKeyword.upsert({
+        where: {
+          keyword_language: { keyword, language },
+        },
+        update: {
+          hits: { increment: 1 },
+        },
+        create: { keyword, language, hits: 1, active: false },
+      });
+    }
+
+    await tx.learnedKeyword.updateMany({
+      where: {
+        keyword: { in: keywords },
+        language,
+        hits: { gte: ACTIVATION_THRESHOLD },
+        active: false,
+      },
+      data: { active: true },
+    });
+  });
 
   return NextResponse.json({ success: true });
 }
