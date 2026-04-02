@@ -1,17 +1,26 @@
-// middleware.ts
-import { auth } from "@/auth";
+import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-export default auth((req) => {
-  const isLoginPage = req.nextUrl.pathname === "/admin/login";
-  if (!req.auth && !isLoginPage) {
-    const loginUrl = req.nextUrl.clone();
-    loginUrl.pathname = "/news/admin/login";
-    return NextResponse.redirect(loginUrl);
+export async function proxy(request: NextRequest) {
+  const token = await getToken({
+    req: request,
+    secret: process.env.AUTH_SECRET,
+  });
+
+  // Use endsWith to handle both "/admin/login" and "/news/admin/login" regardless
+  // of whether Next.js includes the basePath in nextUrl.pathname
+  const isLoginPage = request.nextUrl.pathname.endsWith("/admin/login");
+
+  if (!token && !isLoginPage) {
+    // Construct redirect from raw request.url (always includes origin + basePath)
+    return NextResponse.redirect(new URL("/news/admin/login", request.url));
   }
-});
+
+  return NextResponse.next();
+}
 
 export const config = {
-  // Middleware matchers use paths without the basePath prefix
+  // Matchers use paths without the basePath prefix
   matcher: ["/admin/:path*"],
 };
