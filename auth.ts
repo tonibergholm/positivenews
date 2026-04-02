@@ -13,12 +13,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         const adminEmail = process.env.ADMIN_EMAIL;
         const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
-        if (!adminEmail || !adminPasswordHash) return null;
-        if (credentials.email !== adminEmail) return null;
+        console.error("[auth:debug] email:", credentials?.email, "adminEmail:", adminEmail, "hashExists:", !!adminPasswordHash);
+        if (!adminEmail || !adminPasswordHash) { console.error("[auth:debug] missing env vars"); return null; }
+        if (credentials.email !== adminEmail) { console.error("[auth:debug] email mismatch"); return null; }
         const valid = await bcrypt.compare(
           credentials.password as string,
           adminPasswordHash
         );
+        console.error("[auth:debug] bcrypt valid:", valid);
         if (!valid) return null;
         return { id: "admin", email: adminEmail, name: "Admin" };
       },
