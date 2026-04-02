@@ -32,16 +32,31 @@ model Article {
   category    String
   isPositive  Boolean  @default(true)
   flaggedAt   DateTime?
-  curatedAt   DateTime?
-  createdAt   DateTime @default(now())
+  curatedAt        DateTime?
+  rejectionReason  String?
+  rejectionPass    Int?
+  createdAt        DateTime @default(now())
 }
 
 model LearnedKeyword {
-  id       String  @id @default(cuid())
-  keyword  String
-  language String  @default("en")
-  hits     Int     @default(1)
-  active   Boolean @default(false)
+  id        String    @id @default(cuid())
+  keyword   String
+  language  String    @default("en")
+  hits      Int       @default(1)
+  active    Boolean   @default(false)
+  uniqueIps Int       @default(0)
+  lastHitAt DateTime?
+  createdAt DateTime  @default(now())
 
   @@unique([keyword, language])
+}
+
+model LearnedKeywordFlag {
+  id        String   @id @default(cuid())
+  keyword   String
+  language  String
+  ip        String
+  createdAt DateTime @default(now())
+
+  @@unique([keyword, language, ip])
 }
