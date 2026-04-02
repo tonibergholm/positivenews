@@ -32,7 +32,7 @@ export default async function LoginPage({
             await signIn("credentials", {
               email: formData.get("email"),
               password: formData.get("password"),
-              redirectTo: "/admin",
+              redirectTo: "/news/admin",
             });
           } catch (e) {
             if (e instanceof AuthError) {
