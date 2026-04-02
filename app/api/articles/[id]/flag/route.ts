@@ -58,7 +58,9 @@ export async function POST(
     await prisma.$transaction(async (tx) => {
       for (const keyword of keywords) {
         await tx.learnedKeyword.upsert({
-          where: { keyword },
+          where: {
+            keyword_language: { keyword, language },
+          },
           update: {
             hits: { increment: 1 },
           },
@@ -69,6 +71,7 @@ export async function POST(
       await tx.learnedKeyword.updateMany({
         where: {
           keyword: { in: keywords },
+          language,
           hits: { gte: ACTIVATION_THRESHOLD },
           active: false,
         },

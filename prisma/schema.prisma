@@ -38,8 +38,10 @@ model Article {
 
 model LearnedKeyword {
   id       String  @id @default(cuid())
-  keyword  String  @unique
+  keyword  String
   language String  @default("en")
   hits     Int     @default(1)
   active   Boolean @default(false)
+
+  @@unique([keyword, language])
 }

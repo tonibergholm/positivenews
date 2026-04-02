@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ingestAll } from "@/src/lib/ingest";
-import { curateUnchecked } from "@/src/lib/curate";
+import { isPipelineRunning, runPipeline } from "@/src/lib/pipeline";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // LLM curation can take a while on CPU
@@ -11,13 +10,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (isPipelineRunning()) {
+    return NextResponse.json(
+      { success: false, error: "Ingest already running" },
+      { status: 409 }
+    );
+  }
+
   try {
-    const ingestResult = await ingestAll();
-    const curationResult = await curateUnchecked();
     return NextResponse.json({
       success: true,
-      ...ingestResult,
-      curation: curationResult,
+      ...(await runPipeline()),
     });
   } catch (err) {
     console.error("[/api/ingest]", err);
