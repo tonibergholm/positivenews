@@ -50,13 +50,27 @@ const NEGATIVE_STEMS_FI = [
   "irtisano", "yt-neuvottel",
   // Court/sentencing/crime
   "tuomio", "tuomits", "tuomittu", "syyte", "syrjin",
-  "esitutkint", "tietovuod",
+  "esitutkint", "esitutkinn", "tietovuod",
+  // Arrest (vangittiin conjugation escapes "vanki" due to consonant gradation)
+  "vangitt",
   // Animal attacks
   "puri",
   // Labor disputes
   "työriid", "lakko",
   // Inflation & economy
   "inflaatio", "suhdanne",
+  // Debt & payment defaults
+  "maksuhäiriö", "velkaantu", "maksuvaikeuk",
+  // Bullying
+  "kiusaami",
+  // Outsourcing fluff
+  "ulkoistam",
+  // Suspicious activity
+  "epäilyttäv",
+  // Military spending
+  "ilmapuolustus",
+  // Crisis/doom sentiment
+  "kriis",
   // Constitutional/privacy politics
   "perustuslai", "perusoikeu",
   // Sports investigations
