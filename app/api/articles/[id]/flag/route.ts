@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
 import { extractKeywords } from "@/src/lib/keywords";
+import redis from "@/src/lib/redis";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +84,8 @@ export async function POST(
       data: { active: true },
     });
   });
+
+  await redis.del(`learned:keywords:${language}`);
 
   return NextResponse.json({ success: true });
 }
