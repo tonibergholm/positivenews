@@ -28,18 +28,21 @@ export default async function LoginPage({
       <form
         action={async (formData: FormData) => {
           "use server";
+          let success = false;
           try {
             await signIn("credentials", {
               email: formData.get("email"),
               password: formData.get("password"),
-              redirectTo: "/news/admin",
+              redirect: false,
             });
+            success = true;
           } catch (e) {
             if (e instanceof AuthError) {
               redirect(`/admin/login?error=1`);
             }
             throw e;
           }
+          if (success) redirect("/admin");
         }}
         className="space-y-4"
       >
