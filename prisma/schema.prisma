@@ -21,21 +21,21 @@ model Source {
 }
 
 model Article {
-  id          String   @id @default(cuid())
-  title       String
-  url         String   @unique
-  summary     String?
-  imageUrl    String?
-  publishedAt DateTime
-  source      Source   @relation(fields: [sourceId], references: [id])
-  sourceId    String
-  category    String
-  isPositive  Boolean  @default(true)
-  flaggedAt   DateTime?
-  curatedAt        DateTime?
-  rejectionReason  String?
-  rejectionPass    Int?
-  createdAt        DateTime @default(now())
+  id              String    @id @default(cuid())
+  title           String
+  url             String    @unique
+  summary         String?
+  imageUrl        String?
+  publishedAt     DateTime
+  source          Source    @relation(fields: [sourceId], references: [id])
+  sourceId        String
+  category        String
+  isPositive      Boolean   @default(true)
+  flaggedAt       DateTime?
+  curatedAt       DateTime?
+  rejectionReason String?
+  rejectionPass   Int?
+  createdAt       DateTime  @default(now())
 }
 
 model LearnedKeyword {
