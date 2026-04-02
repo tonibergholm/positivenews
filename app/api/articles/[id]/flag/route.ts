@@ -5,7 +5,8 @@ import redis from "@/src/lib/redis";
 
 export const dynamic = "force-dynamic";
 
-const ACTIVATION_THRESHOLD = 3;
+const KEYWORD_MIN_HITS = parseInt(process.env.KEYWORD_MIN_HITS ?? "5", 10);
+const KEYWORD_MIN_IPS = parseInt(process.env.KEYWORD_MIN_IPS ?? "2", 10);
 
 const flagRateMap = new Map<string, { count: number; resetAt: number }>();
 const FLAG_WINDOW_MS = 60_000;
@@ -49,7 +50,6 @@ export async function POST(
     return NextResponse.json({ success: true, duplicate: true });
   }
 
-  // Extract keywords and upsert into learned keywords
   const language = article.source.language;
   const keywords = extractKeywords(article.title, language);
 
@@ -59,26 +59,44 @@ export async function POST(
       data: { isPositive: false, flaggedAt: new Date() },
     });
 
-    // Another request flagged this article first. Treat the operation as idempotent.
     if (result.count === 0 || keywords.length === 0) return;
 
+    // Upsert keywords: increment hits and lastHitAt
     for (const keyword of keywords) {
       await tx.learnedKeyword.upsert({
-        where: {
-          keyword_language: { keyword, language },
-        },
+        where: { keyword_language: { keyword, language } },
         update: {
           hits: { increment: 1 },
+          lastHitAt: new Date(),
         },
-        create: { keyword, language, hits: 1, active: false },
+        create: { keyword, language, hits: 1, active: false, lastHitAt: new Date() },
       });
     }
 
+    // Record this IP's contribution (skip if already recorded)
+    await tx.learnedKeywordFlag.createMany({
+      data: keywords.map((keyword) => ({ keyword, language, ip })),
+      skipDuplicates: true,
+    });
+
+    // Recount uniqueIps from LearnedKeywordFlag for each keyword
+    for (const keyword of keywords) {
+      const count = await tx.learnedKeywordFlag.count({
+        where: { keyword, language },
+      });
+      await tx.learnedKeyword.update({
+        where: { keyword_language: { keyword, language } },
+        data: { uniqueIps: count },
+      });
+    }
+
+    // Auto-activate keywords that meet threshold
     await tx.learnedKeyword.updateMany({
       where: {
         keyword: { in: keywords },
         language,
-        hits: { gte: ACTIVATION_THRESHOLD },
+        hits: { gte: KEYWORD_MIN_HITS },
+        uniqueIps: { gte: KEYWORD_MIN_IPS },
         active: false,
       },
       data: { active: true },
