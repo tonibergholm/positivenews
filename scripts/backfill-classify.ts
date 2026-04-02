@@ -55,7 +55,7 @@ async function main() {
       if (trusted) {
         skipped++;
       } else {
-        const isPositive = classifyPositive(article.title, article.summary, language);
+        const { positive: isPositive } = classifyPositive(article.title, article.summary, language);
         if (!isPositive) {
           updates.push(article.id);
           rejected++;

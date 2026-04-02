@@ -327,7 +327,7 @@ export function classifyPositiveSync(
   title: string,
   summary?: string | null,
   language = "en"
-): boolean {
+): { positive: boolean; reason?: string } {
   const text = summary
     ? `${title} ${summary.slice(0, 300)}`
     : title;
@@ -341,6 +341,9 @@ export function classifyPositiveSync(
     : negativeHitsEnglish(tokens, normalizedText, []);
   const posHits = stemMatch(tokens, isFinnish ? POSITIVE_OVERRIDES_FI : POSITIVE_OVERRIDES_EN, isFinnish);
 
-  if (posHits > 0 && negHits <= posHits) return true;
-  return negHits < THRESHOLD;
+  if (posHits > 0 && negHits <= posHits) return { positive: true };
+  if (negHits >= THRESHOLD) {
+    return { positive: false, reason: findRejectionReason(tokens, normalizedText, isFinnish, []) };
+  }
+  return { positive: true };
 }
