@@ -47,3 +47,4 @@ next-env.d.ts
 /app/generated/prisma
 .gstack/
 .claude/settings.local.json
+.worktrees/
