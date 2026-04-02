@@ -229,6 +229,51 @@ function phraseMatch(text: string, phrases: string[]): number {
   return hits;
 }
 
+// ── Reason extraction (called only when positive = false) ───────────
+
+function firstExactMatch(tokens: string[], words: string[]): string | null {
+  const tokenSet = new Set(tokens);
+  for (const word of words) {
+    if (tokenSet.has(word)) return word;
+  }
+  return null;
+}
+
+function firstStemMatchReason(tokens: string[], stems: string[], useIncludes: boolean): string | null {
+  for (const token of tokens) {
+    for (const stem of stems) {
+      if (useIncludes ? token.includes(stem) : token.startsWith(stem)) {
+        return stem;
+      }
+    }
+  }
+  return null;
+}
+
+function firstPhraseMatch(text: string, phrases: string[]): string | null {
+  for (const phrase of phrases) {
+    if (text.includes(phrase)) return phrase;
+  }
+  return null;
+}
+
+function findRejectionReason(
+  tokens: string[],
+  text: string,
+  isFinnish: boolean,
+  learned: string[]
+): string {
+  if (isFinnish) {
+    const match = firstStemMatchReason(tokens, [...NEGATIVE_STEMS_FI, ...learned], true);
+    return `keyword: ${match ?? "unknown"}`;
+  }
+  const match =
+    firstExactMatch(tokens, [...NEGATIVE_WORDS_EN, ...learned]) ??
+    firstStemMatchReason(tokens, NEGATIVE_PREFIXES_EN, false) ??
+    firstPhraseMatch(text, NEGATIVE_PHRASES_EN);
+  return `keyword: ${match ?? "unknown"}`;
+}
+
 function negativeHitsEnglish(tokens: string[], text: string, learned: string[]): number {
   return (
     exactMatch(tokens, NEGATIVE_WORDS_EN) +
@@ -246,7 +291,7 @@ export async function classifyPositive(
   title: string,
   summary?: string | null,
   language = "en"
-): Promise<boolean> {
+): Promise<{ positive: boolean; reason?: string }> {
   const text = summary
     ? `${title} ${summary.slice(0, 300)}`
     : title;
@@ -263,10 +308,16 @@ export async function classifyPositive(
     : negativeHitsEnglish(tokens, normalizedText, learned);
   const posHits = stemMatch(tokens, posStemsList, isFinnish);
 
-  // Positive overrides negative when both present
-  if (posHits > 0 && negHits <= posHits) return true;
+  if (posHits > 0 && negHits <= posHits) return { positive: true };
 
-  return negHits < THRESHOLD;
+  if (negHits >= THRESHOLD) {
+    return {
+      positive: false,
+      reason: findRejectionReason(tokens, normalizedText, isFinnish, learned),
+    };
+  }
+
+  return { positive: true };
 }
 
 /**
