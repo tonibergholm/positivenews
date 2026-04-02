@@ -2,6 +2,8 @@
 import { prisma } from "@/src/lib/prisma";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 function timeAgo(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
   if (seconds < 60) return `${seconds}s ago`;
