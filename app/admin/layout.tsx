@@ -20,7 +20,7 @@ export default async function AdminLayout({
   const session = await auth();
   if (!session) redirect("/admin/login");
 
-  const pendingCount = await getPendingKeywordCount();
+  const pendingCount = await getPendingKeywordCount().catch(() => 0);
 
   return (
     <div>
