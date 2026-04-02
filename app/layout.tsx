@@ -74,6 +74,10 @@ export default function RootLayout({
                 News Sources
               </Link>
               <span className="text-border">·</span>
+              <Link href="/stats" className="hover:text-foreground transition-colors">
+                Pipeline Stats
+              </Link>
+              <span className="text-border">·</span>
               <Link href="/privacy" className="hover:text-foreground transition-colors">
                 Privacy Policy
               </Link>

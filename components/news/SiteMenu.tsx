@@ -44,6 +44,13 @@ export function SiteMenu() {
           >
             News Sources
           </Link>
+          <Link
+            href="/stats"
+            onClick={() => setOpen(false)}
+            className="block px-4 py-2 text-sm text-foreground hover:bg-secondary transition-colors"
+          >
+            Pipeline Stats
+          </Link>
           <div className="my-1 border-t border-border/60" />
           <Link
             href="/privacy"
