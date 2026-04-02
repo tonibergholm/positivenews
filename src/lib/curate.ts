@@ -20,24 +20,21 @@ export async function curateUnchecked(): Promise<{
   skipped: number;
 }> {
   // Find articles that passed keyword filter but haven't been LLM-curated
-  // curatedAt is a new field — cast to any for local TS compat with Prisma 7
-  const unchecked = await (prisma.article as any).findMany({
+  const unchecked = await prisma.article.findMany({
     where: {
       isPositive: true,
       curatedAt: null,
       flaggedAt: null,
     },
-    include: {
+    select: {
+      id: true,
+      title: true,
+      summary: true,
       source: { select: { url: true, language: true } },
     },
     orderBy: { publishedAt: "desc" },
     take: 50, // cap per run to avoid long-running jobs
-  }) as Array<{
-    id: string;
-    title: string;
-    summary: string | null;
-    source: { url: string; language: string };
-  }>;
+  });
 
   if (unchecked.length === 0) {
     console.log("[curate] No unchecked articles found");
@@ -53,7 +50,7 @@ export async function curateUnchecked(): Promise<{
   );
 
   if (trusted.length > 0) {
-    await (prisma.article as any).updateMany({
+    await prisma.article.updateMany({
       where: { id: { in: trusted.map((a) => a.id) } },
       data: { curatedAt: new Date() },
     });
@@ -74,22 +71,34 @@ export async function curateUnchecked(): Promise<{
 
   const results = await curateArticles(inputs);
 
+  const approvedIds: string[] = [];
+  const rejectedIds: string[] = [];
   let rejected = 0;
 
   for (const r of results) {
     if (r.isPositive) {
-      await (prisma.article as any).update({
-        where: { id: r.id },
-        data: { curatedAt: new Date() },
-      });
+      approvedIds.push(r.id);
     } else {
-      await (prisma.article as any).update({
-        where: { id: r.id },
-        data: { isPositive: false, curatedAt: new Date() },
-      });
+      rejectedIds.push(r.id);
       rejected++;
       console.log(`[curate] Rejected: "${needsCuration.find((a) => a.id === r.id)?.title}" — ${r.reason} (pass ${r.pass})`);
     }
+  }
+
+  const curatedAt = new Date();
+
+  if (approvedIds.length > 0) {
+    await prisma.article.updateMany({
+      where: { id: { in: approvedIds } },
+      data: { curatedAt },
+    });
+  }
+
+  if (rejectedIds.length > 0) {
+    await prisma.article.updateMany({
+      where: { id: { in: rejectedIds } },
+      data: { isPositive: false, curatedAt },
+    });
   }
 
   const curated = trusted.length + results.length - rejected;

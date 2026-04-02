@@ -80,7 +80,9 @@ export function ArticleCard({ article, onFlagged }: ArticleCardProps) {
 
     setFlagging(true);
     try {
-      await fetch(`/news/api/articles/${article.id}/flag`, { method: "POST" });
+      const res = await fetch(`/news/api/articles/${article.id}/flag`, { method: "POST" });
+      if (!res.ok) return;
+
       setHidden(true);
       onFlagged?.(article.id);
     } catch {

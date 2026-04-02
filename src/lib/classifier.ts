@@ -129,11 +129,10 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 export async function refreshLearnedKeywords(): Promise<void> {
   try {
-    const keywords: { keyword: string; language: string }[] =
-      await (prisma as any).learnedKeyword.findMany({
-        where: { active: true },
-        select: { keyword: true, language: true },
-      });
+    const keywords = await prisma.learnedKeyword.findMany({
+      where: { active: true },
+      select: { keyword: true, language: true },
+    });
     learnedCache = {
       fi: keywords.filter((k) => k.language === "fi").map((k) => k.keyword),
       en: keywords.filter((k) => k.language === "en").map((k) => k.keyword),

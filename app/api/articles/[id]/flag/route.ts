@@ -54,25 +54,27 @@ export async function POST(
   const language = article.source.language;
   const keywords = extractKeywords(article.title, language);
 
-  for (const keyword of keywords) {
-    const existing = await prisma.learnedKeyword.findUnique({
-      where: { keyword },
-    });
+  if (keywords.length > 0) {
+    await prisma.$transaction(async (tx) => {
+      for (const keyword of keywords) {
+        await tx.learnedKeyword.upsert({
+          where: { keyword },
+          update: {
+            hits: { increment: 1 },
+          },
+          create: { keyword, language, hits: 1, active: false },
+        });
+      }
 
-    if (existing) {
-      const newHits = existing.hits + 1;
-      await prisma.learnedKeyword.update({
-        where: { keyword },
-        data: {
-          hits: newHits,
-          active: newHits >= ACTIVATION_THRESHOLD,
+      await tx.learnedKeyword.updateMany({
+        where: {
+          keyword: { in: keywords },
+          hits: { gte: ACTIVATION_THRESHOLD },
+          active: false,
         },
+        data: { active: true },
       });
-    } else {
-      await prisma.learnedKeyword.create({
-        data: { keyword, language, hits: 1, active: false },
-      });
-    }
+    });
   }
 
   return NextResponse.json({ success: true });

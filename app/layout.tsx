@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DM_Sans, Fraunces, Geist_Mono } from "next/font/google";
+import Image from "next/image";
 import Link from "next/link";
 import { SiteMenu } from "@/components/news/SiteMenu";
 import { ThemeToggle } from "@/components/news/ThemeToggle";
@@ -39,7 +40,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-background">
         <header className="sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center gap-3">
-            <img
+            <Image
               src="/news/logo.svg"
               alt=""
               aria-hidden

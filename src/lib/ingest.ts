@@ -83,12 +83,6 @@ async function ingestFeed(feed: FeedSource): Promise<number> {
     const imageUrl = rawImageUrl ? rawImageUrl.slice(0, 2048) : null;
 
     try {
-      const exists = await prisma.article.findUnique({
-        where: { url },
-        select: { id: true },
-      });
-      if (exists) continue;
-
       const isPositive = feed.trusted
         ? true
         : await classifyPositive(safeTitle, summary, feed.language);
@@ -106,8 +100,18 @@ async function ingestFeed(feed: FeedSource): Promise<number> {
         },
       });
       saved++;
-    } catch {
-      // constraint violation — skip silently
+    } catch (error) {
+      // Duplicate URLs are expected across repeated ingest runs.
+      if (
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        error.code === "P2002"
+      ) {
+        continue;
+      }
+
+      console.error(`[ingest] Failed to save article from ${feed.name}:`, error);
     }
   }
 

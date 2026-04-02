@@ -4,32 +4,32 @@ import { useEffect, useState } from "react";
 
 const STORAGE_KEY = "positivenews:theme";
 
+function getInitialTheme(): boolean {
+  if (typeof window === "undefined") return false;
+
+  const stored = localStorage.getItem(STORAGE_KEY);
+  return stored === "dark" ||
+    (!stored && window.matchMedia("(prefers-color-scheme: dark)").matches);
+}
+
 export function ThemeToggle() {
-  const [dark, setDark] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [dark, setDark] = useState(getInitialTheme);
 
   useEffect(() => {
-    setMounted(true);
-    const stored = localStorage.getItem(STORAGE_KEY);
-    const prefersDark = stored === "dark" ||
-      (!stored && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    setDark(prefersDark);
-    document.documentElement.classList.toggle("dark", prefersDark);
-  }, []);
+    document.documentElement.classList.toggle("dark", dark);
+  }, [dark]);
 
   function toggle() {
     const next = !dark;
     setDark(next);
-    document.documentElement.classList.toggle("dark", next);
     localStorage.setItem(STORAGE_KEY, next ? "dark" : "light");
   }
-
-  if (!mounted) return null;
 
   return (
     <button
       onClick={toggle}
       title={dark ? "Switch to light mode" : "Switch to dark mode"}
+      suppressHydrationWarning
       className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
     >
       {dark ? (
