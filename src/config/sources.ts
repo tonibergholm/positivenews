@@ -13,6 +13,8 @@ export interface FeedSource {
   language: string;
   /** true = curated positive-news outlet; skip LLM classification */
   trusted?: boolean;
+  /** false = skip this feed during ingest. Omit to keep active (default). */
+  isActive?: boolean;
 }
 
 export const FEED_SOURCES: FeedSource[] = [

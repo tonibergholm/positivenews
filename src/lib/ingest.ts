@@ -136,7 +136,7 @@ async function ingestFeed(feed: FeedSource): Promise<number> {
 export async function ingestAll(): Promise<{ total: number; errors: string[] }> {
   const errors: string[] = [];
 
-  const activeSources = FEED_SOURCES.filter(() => true); // all active
+  const activeSources = FEED_SOURCES.filter((f) => f.isActive !== false);
 
   const results = await Promise.allSettled(
     activeSources.map(async (feed) => {
