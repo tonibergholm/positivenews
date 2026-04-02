@@ -58,7 +58,7 @@ export async function GET() {
       byCategory.map((row) => [row.category, row._count.id])
     ),
     bySources: bySourceId.map((row) => ({
-      name: sourceMap.get(row.sourceId) ?? row.sourceId,
+      name: sourceMap.get(row.sourceId) ?? "(unknown)",
       count: row._count.id,
       lastArticle: row._max.publishedAt ?? null,
     })),
