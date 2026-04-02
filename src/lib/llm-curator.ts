@@ -34,6 +34,32 @@ export interface CurationResult {
   pass: 1 | 2;
 }
 
+// ── Shared rejection rules (used in both Pass 1 and Pass 2) ──────────
+
+const SHARED_REJECTION_RULES = [
+  "Sports roster moves, transfers, coaching changes, retirements, lawsuits — only genuine triumphs count",
+  "Sports scores, doping, league standings, match results",
+  "Shopping sales and promotions (spring sale, Amazon deals, deal of the day, best price)",
+  "Consumer product reviews, upgrades, or best-of roundups",
+  "Crossword puzzles, quizzes, games, horoscopes — not news",
+  "Entrepreneurship clickbait (dare to start, how companies fail, why you should start a business)",
+  "CEO interview roundups and what-leaders-said puff pieces",
+  "Rising costs, price increases, inflation, affordability complaints",
+  "Political threats, sanctions, military activity (fighter jets, drones, air space violations, defense exercises)",
+  "Administrative/bureaucratic disputes and legal complaints",
+  "Health scares: anti-vaccination trends, disease outbreaks, declining health stats",
+  "Cancelled events, illness of politicians or public figures",
+  "Layoffs, firings, job cuts, restructuring",
+  "Court verdicts, criminal convictions, sentencing, discrimination cases",
+  "Police investigations, data breaches, leaked personal data",
+  "Animal attacks on people",
+  "Constitutional/privacy law debates, governance criticism",
+  "Sports investigations and misconduct probes",
+  "Conflict of interest stories, cronyism, insider appointments",
+  "Environmental LOSS, alarm, or wildlife CRIME stories (illegal trade, poaching)",
+  "Clickbait listicles with no real substance",
+].map((r) => `- ${r}`).join("\n");
+
 // ── Prompts ──────────────────────────────────────────────────────────
 
 function buildPass1Prompt(articles: ArticleInput[]): string {
@@ -59,24 +85,14 @@ INCLUDE (positive = true) — ONLY these:
 EXCLUDE (positive = false) — be aggressive here:
 - ANY mention of war, military threats, geopolitics, territorial disputes, sanctions, or drones/missiles
 - ANY mention of Trump, Putin, or other politicians in conflict/threat context
-- ANY military activity: fighter jets, air space violations, defense exercises
 - Violent crime, political bickering, government disputes, legal complaints
 - Rage-bait, scandals, celebrity gossip
 - Alarmist headlines (even if story is neutral)
 - Tragic accidents, water damage, insurance disputes (even with a silver lining)
 - Opinion pieces, columns, editorials about societal problems
 - Error reports, corrections, failures
-- Health ALARM stories: declining vaccination rates, disease outbreaks, pandemic fears
-- Sports roster moves, transfers, coaching changes, retirements, lawsuits (NOT triumphs)
-- Sports scores, doping, league standings, match results ("crushed", "thrashed")
-- Rising costs, price complaints, inflation stories ("X now costs more", "kallistui")
-- Crossword puzzles, quizzes, games, entertainment filler — NOT news
-- Administrative/bureaucratic disputes (e.g. regions filing complaints to chancellor)
+${SHARED_REJECTION_RULES}
 - Generic product news, consumer reviews, Amazon sales, shopping deals
-- Product/shopping sales and promotions ("spring sale", "blowing out", "deal of the day")
-- Cancelled visits, illness of politicians or public figures
-- Entrepreneurship clickbait ("why you should start a business", "how companies fail")
-- Wildlife CRIME or illegal trade stories (poaching, smuggling) — these are negative, not environmental wins
 
 Return ONLY this JSON: {"results": [{"id": "...", "positive": true/false, "reason": "brief reason"}]}
 
@@ -106,45 +122,12 @@ REJECT everything else, including:
 - Marketing disguised as news (product launches, brand collaborations, celebrity collections)
 - Generic business deals, contracts, or corporate transactions
 - Business thought-leader puff pieces ("insights from CEO X", "future of business")
-- Entrepreneurship clickbait ("dare to start", "how companies fail/succeed in X")
-- CEO interview roundups, "here's what they said" puff pieces
-- Layoffs, firings, job cuts, restructuring
 - Labor disputes, strikes, union conflicts without resolution
-- Court verdicts, criminal convictions, sentencing, discrimination lawsuits
-- Police investigations, data breaches, leaked personal data
-- Animal attacks, bites, maulings
-- Inflation reports, economic downturns, cost-of-living alarm
-- Constitutional/privacy law debates, governance criticism
-- Sports misconduct investigations, doping probes
 - Dangerous roads, safety hazards, infrastructure failures
 - Tech platform problems (spam, abuse, outages)
-- Conflict of interest stories, cronyism
-- Environmental LOSS, alarm, or wildlife CRIME stories (illegal trade, poaching)
 - Stories about errors, failures, corrections, or things getting worse
-- Consumer product reviews, upgrades, or "best of" roundups
-- Shopping sales and promotions ("spring sale", Amazon deals, "best price")
-- Clickbait listicles with no real substance
-- Crossword puzzles, quizzes, games, horoscopes — not news
-- Sports personnel changes, lawsuits, match results — only genuine TRIUMPHS count
-- Rising costs, price increases, affordability complaints, insurance disputes
-- Political threats, sanctions, military activity, drone incidents
-- Administrative disputes, legal complaints, bureaucratic problems
-- Health scares: anti-vaccination trends, disease outbreaks, declining health stats
-- Cancelled events, illness/health of politicians
-- Layoffs, firings, job cuts, restructuring — people losing their jobs is not positive
-- Labor disputes, strikes without resolution
-- Court verdicts, criminal convictions, sentencing, discrimination cases
-- Police investigations, data breaches, security incidents
-- Animal attacks on people
-- Inflation, economic alarm, cost-of-living stories
-- Constitutional/privacy debates, governance criticism
-- Sports investigations, misconduct probes
-- Infrastructure dangers, safety hazards
-- Tech platform spam, abuse, outages
-- Conflict of interest, cronyism, appointments of insiders
+${SHARED_REJECTION_RULES}
 - "Your X is ugly / broken, this company wants to fix it" — product marketing
-- CEO interview compilations, "what leaders said" roundups
-- Filler content that is not actually news (puzzles, opinion polls, Q&A columns)
 
 Return ONLY this JSON: {"results": [{"id": "...", "keep": true/false, "reason": "brief reason"}]}
 

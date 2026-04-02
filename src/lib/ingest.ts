@@ -31,7 +31,14 @@ function parsePublishedAt(item: Parser.Item): Date | null {
 async function upsertSource(feed: FeedSource): Promise<string> {
   const source = await prisma.source.upsert({
     where: { url: feed.url },
-    update: { name: feed.name, category: feed.category, isActive: true },
+    update: {
+      name: feed.name,
+      category: feed.category,
+      // isActive: true is intentional — sources inactive in the config
+      // never reach upsertSource (filtered by ingestAll). The DB column
+      // reflects "was processed at least once" and resets on each run.
+      isActive: true,
+    },
     create: {
       name: feed.name,
       url: feed.url,
@@ -136,7 +143,7 @@ async function ingestFeed(feed: FeedSource): Promise<number> {
 export async function ingestAll(): Promise<{ total: number; errors: string[] }> {
   const errors: string[] = [];
 
-  const activeSources = FEED_SOURCES.filter(() => true); // all active
+  const activeSources = FEED_SOURCES.filter((f) => f.isActive !== false);
 
   const results = await Promise.allSettled(
     activeSources.map(async (feed) => {

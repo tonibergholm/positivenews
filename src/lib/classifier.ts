@@ -2,11 +2,12 @@
  * Positive-news classifier.
  *
  * Uses keyword matching with Finnish stem awareness plus learned
- * keywords from user feedback. Learned keywords are cached in memory
- * and refreshed every 5 minutes.
+ * keywords from user feedback. Learned keywords are cached in Redis
+ * and invalidated on write (when an article is flagged).
  */
 
 import { prisma } from "./prisma";
+import redis from "./redis";
 
 // ── Built-in negative stems ─────────────────────────────────────────
 
@@ -147,38 +148,33 @@ const POSITIVE_OVERRIDES_EN = [
   "record-break",
 ];
 
-// ── Learned keywords cache ──────────────────────────────────────────
-
-interface LearnedCache {
-  fi: string[];
-  en: string[];
-  loadedAt: number;
-}
-
-let learnedCache: LearnedCache = { fi: [], en: [], loadedAt: 0 };
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-export async function refreshLearnedKeywords(): Promise<void> {
-  try {
-    const keywords = await prisma.learnedKeyword.findMany({
-      where: { active: true },
-      select: { keyword: true, language: true },
-    });
-    learnedCache = {
-      fi: keywords.filter((k) => k.language === "fi").map((k) => k.keyword),
-      en: keywords.filter((k) => k.language === "en").map((k) => k.keyword),
-      loadedAt: Date.now(),
-    };
-  } catch {
-    // DB unavailable — keep stale cache
-  }
-}
+// ── Learned keywords cache (Redis) ─────────────────────────────────
 
 async function getLearnedKeywords(language: string): Promise<string[]> {
-  if (Date.now() - learnedCache.loadedAt > CACHE_TTL) {
-    await refreshLearnedKeywords();
+  const key = `learned:keywords:${language}`;
+
+  try {
+    const cached = await redis.get(key);
+    if (cached) return JSON.parse(cached) as string[];
+  } catch {
+    // Redis unavailable — fall through to DB
   }
-  return language === "fi" ? learnedCache.fi : learnedCache.en;
+
+  try {
+    const rows = await prisma.learnedKeyword.findMany({
+      where: { active: true, language },
+      select: { keyword: true },
+    });
+    const list = rows.map((r) => r.keyword);
+    try {
+      await redis.set(key, JSON.stringify(list));
+    } catch {
+      // Redis write failed — return DB results without caching
+    }
+    return list;
+  } catch {
+    return [];
+  }
 }
 
 // ── Tokenizer & matcher ─────────────────────────────────────────────
