@@ -72,14 +72,14 @@ export async function curateUnchecked(): Promise<{
   const results = await curateArticles(inputs);
 
   const approvedIds: string[] = [];
-  const rejectedIds: string[] = [];
+  const rejectedResults: Array<{ id: string; reason: string; pass: 1 | 2 }> = [];
   let rejected = 0;
 
   for (const r of results) {
     if (r.isPositive) {
       approvedIds.push(r.id);
     } else {
-      rejectedIds.push(r.id);
+      rejectedResults.push({ id: r.id, reason: r.reason, pass: r.pass });
       rejected++;
       console.log(`[curate] Rejected: "${needsCuration.find((a) => a.id === r.id)?.title}" — ${r.reason} (pass ${r.pass})`);
     }
@@ -94,11 +94,20 @@ export async function curateUnchecked(): Promise<{
     });
   }
 
-  if (rejectedIds.length > 0) {
-    await prisma.article.updateMany({
-      where: { id: { in: rejectedIds } },
-      data: { isPositive: false, curatedAt },
-    });
+  if (rejectedResults.length > 0) {
+    await prisma.$transaction(
+      rejectedResults.map((r) =>
+        prisma.article.update({
+          where: { id: r.id },
+          data: {
+            isPositive: false,
+            curatedAt,
+            rejectionReason: r.reason,
+            rejectionPass: r.pass,
+          },
+        })
+      )
+    );
   }
 
   const curated = trusted.length + results.length - rejected;
