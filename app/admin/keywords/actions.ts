@@ -3,6 +3,7 @@
 
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/src/lib/prisma";
 import redis from "@/src/lib/redis";
 
@@ -25,6 +26,7 @@ export async function activateKeyword(id: string) {
     data: { active: true },
   });
   await invalidateKeywordCaches();
+  revalidatePath("/admin/keywords");
 }
 
 export async function deactivateKeyword(id: string) {
@@ -34,6 +36,7 @@ export async function deactivateKeyword(id: string) {
     data: { active: false },
   });
   await invalidateKeywordCaches();
+  revalidatePath("/admin/keywords");
 }
 
 export async function deleteKeyword(id: string) {
@@ -47,4 +50,5 @@ export async function deleteKeyword(id: string) {
     prisma.learnedKeyword.delete({ where: { id } }),
   ]);
   await invalidateKeywordCaches();
+  revalidatePath("/admin/keywords");
 }
