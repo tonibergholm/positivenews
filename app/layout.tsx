@@ -40,17 +40,19 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-background">
         <header className="sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center gap-3">
-            <Image
-              src="/news/logo.svg"
-              alt=""
-              aria-hidden
-              width={28}
-              height={28}
-              className="select-none shrink-0"
-            />
-            <span className="font-heading font-semibold text-lg tracking-tight text-foreground">
-              PositiveNews
-            </span>
+            <Link href="/" className="flex items-center gap-3">
+              <Image
+                src="/news/logo.svg"
+                alt=""
+                aria-hidden
+                width={28}
+                height={28}
+                className="select-none shrink-0"
+              />
+              <span className="font-heading font-semibold text-lg tracking-tight text-foreground">
+                PositiveNews
+              </span>
+            </Link>
             <span className="hidden sm:inline text-xs text-muted-foreground ml-1 mt-0.5">
               Good things happening in the world
             </span>
