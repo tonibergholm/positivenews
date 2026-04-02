@@ -51,3 +51,4 @@ next-env.d.ts
 .gstack/
 .claude/settings.local.json
 .worktrees/
+.claude.local.md
