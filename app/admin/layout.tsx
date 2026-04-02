@@ -1,7 +1,6 @@
 // app/admin/layout.tsx
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
-import { redirect } from "next/navigation";
 import { prisma } from "@/src/lib/prisma";
 
 async function getPendingKeywordCount(): Promise<number> {
@@ -18,7 +17,9 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const session = await auth();
-  if (!session) redirect("/admin/login");
+  // Login page is also wrapped by this layout — render children directly when unauthenticated.
+  // The proxy handles auth protection; the layout just adds the nav for authenticated users.
+  if (!session) return <>{children}</>;
 
   const pendingCount = await getPendingKeywordCount().catch(() => 0);
 
@@ -62,7 +63,7 @@ export default async function AdminLayout({
             <form
               action={async () => {
                 "use server";
-                await signOut({ redirectTo: "/admin/login" });
+                await signOut({ redirectTo: "/news/admin/login" });
               }}
             >
               <button
