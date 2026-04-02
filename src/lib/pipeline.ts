@@ -1,5 +1,6 @@
 import { curateUnchecked } from "./curate";
 import { ingestAll } from "./ingest";
+import { deactivateStaleKeywords, activatePendingKeywords } from "./keywords-maintenance";
 
 interface PipelineResult {
   total: number;
@@ -17,6 +18,10 @@ export async function runPipeline(): Promise<PipelineResult> {
   if (pipelineRun) return pipelineRun;
 
   pipelineRun = (async () => {
+    // Keyword maintenance runs before ingest so fresh keywords are available
+    await deactivateStaleKeywords();
+    await activatePendingKeywords();
+
     const ingestResult = await ingestAll();
     const curationResult = await curateUnchecked();
 
