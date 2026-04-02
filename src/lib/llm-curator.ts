@@ -92,6 +92,7 @@ EXCLUDE (positive = false) — be aggressive here:
 - Opinion pieces, columns, editorials about societal problems
 - Error reports, corrections, failures
 ${SHARED_REJECTION_RULES}
+- Generic product news, consumer reviews, Amazon sales, shopping deals
 
 Return ONLY this JSON: {"results": [{"id": "...", "positive": true/false, "reason": "brief reason"}]}
 
@@ -126,6 +127,7 @@ REJECT everything else, including:
 - Tech platform problems (spam, abuse, outages)
 - Stories about errors, failures, corrections, or things getting worse
 ${SHARED_REJECTION_RULES}
+- "Your X is ugly / broken, this company wants to fix it" — product marketing
 
 Return ONLY this JSON: {"results": [{"id": "...", "keep": true/false, "reason": "brief reason"}]}
 
