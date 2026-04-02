@@ -99,9 +99,6 @@ export function StatsView() {
     return () => clearInterval(id);
   }, [lastUpdated]);
 
-  const updatedText =
-    secondsAgo <= 2 ? "updated just now" : `updated ${secondsAgo}s ago`;
-
   if (!stats) {
     return (
       <div className="max-w-3xl mx-auto py-8 px-0">
@@ -114,6 +111,9 @@ export function StatsView() {
       </div>
     );
   }
+
+  const updatedText =
+    secondsAgo <= 2 ? "updated just now" : `updated ${secondsAgo}s ago`;
 
   const acceptancePct = Math.round((1 - stats.articles.rejectionRate) * 100);
   const rejectionPct = Math.round(stats.articles.rejectionRate * 100);
@@ -237,7 +237,7 @@ export function StatsView() {
                     {src.count.toLocaleString()}
                   </td>
                   <td className="px-4 py-3 text-right text-xs text-muted-foreground tabular-nums whitespace-nowrap hidden sm:table-cell">
-                    <time dateTime={src.lastArticle ?? ""}>
+                    <time dateTime={src.lastArticle ?? undefined}>
                       {formatLastArticle(src.lastArticle)}
                     </time>
                   </td>
