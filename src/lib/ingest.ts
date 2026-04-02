@@ -104,8 +104,8 @@ async function ingestFeed(feed: FeedSource): Promise<number> {
     const imageUrl = extractImageUrl(item as Parser.Item & Record<string, unknown>);
 
     try {
-      const isPositive = feed.trusted
-        ? true
+      const classResult = feed.trusted
+        ? { positive: true as const }
         : await classifyPositive(safeTitle, summary, feed.language);
 
       await prisma.article.create({
@@ -117,7 +117,11 @@ async function ingestFeed(feed: FeedSource): Promise<number> {
           publishedAt,
           sourceId,
           category: feed.category,
-          isPositive,
+          isPositive: classResult.positive,
+          rejectionReason: classResult.positive
+            ? null
+            : (classResult.reason ?? "keyword filter"),
+          rejectionPass: classResult.positive ? null : 0,
         },
       });
       saved++;
