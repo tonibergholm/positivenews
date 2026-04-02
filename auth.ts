@@ -4,8 +4,6 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  // With Next.js basePath "/news", Auth.js routes live at /news/api/auth
-  basePath: "/news/api/auth",
   providers: [
     Credentials({
       credentials: {
