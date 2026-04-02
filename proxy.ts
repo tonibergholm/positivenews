@@ -6,7 +6,7 @@ export default auth((req) => {
   const isLoginPage = req.nextUrl.pathname === "/admin/login";
   if (!req.auth && !isLoginPage) {
     const loginUrl = req.nextUrl.clone();
-    loginUrl.pathname = "/admin/login";
+    loginUrl.pathname = "/news/admin/login";
     return NextResponse.redirect(loginUrl);
   }
 });
