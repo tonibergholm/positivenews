@@ -4,7 +4,21 @@ import { isPipelineRunning } from "@/src/lib/pipeline";
 
 export const dynamic = "force-dynamic";
 
-async function buildSnapshot() {
+interface StatsSnapshot {
+  pipeline: { running: boolean };
+  articles: {
+    total: number;
+    positive: number;
+    last24h: number;
+    rejectionRate: number;
+    oldest: Date | null;
+    newest: Date | null;
+  };
+  byCategory: Record<string, number>;
+  bySources: Array<{ name: string; count: number; lastArticle: Date | null }>;
+}
+
+async function buildSnapshot(): Promise<StatsSnapshot> {
   const now = new Date();
   const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
@@ -60,16 +74,27 @@ export async function GET(request: NextRequest) {
       let lastJson: string | null = null;
 
       async function fetchAndPush() {
+        let snapshot: StatsSnapshot;
         try {
-          const snapshot = await buildSnapshot();
-          const json = JSON.stringify(snapshot);
-          if (json !== lastJson) {
+          snapshot = await buildSnapshot();
+        } catch {
+          // Transient DB error — skip this tick, client will see staleness
+          return;
+        }
+        const json = JSON.stringify(snapshot);
+        if (json !== lastJson) {
+          try {
             controller.enqueue(encoder.encode(`data: ${json}\n\n`));
             lastJson = json;
+          } catch {
+            // Stream is closed — clear interval
+            clearInterval(intervalId);
           }
-        } catch {
-          // Ignore — client will see staleness via the "updated Xs ago" counter
         }
+      }
+
+      if (request.signal.aborted) {
+        return;
       }
 
       fetchAndPush();
