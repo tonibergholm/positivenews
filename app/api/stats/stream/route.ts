@@ -15,14 +15,14 @@ interface StatsSnapshot {
     newest: Date | null;
   };
   byCategory: Record<string, number>;
-  bySources: Array<{ name: string; count: number; lastArticle: Date | null }>;
+  bySources: Array<{ name: string; count: number; rejectionRate: number; lastArticle: Date | null }>;
 }
 
 async function buildSnapshot(): Promise<StatsSnapshot> {
   const now = new Date();
   const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-  const [total, positive, last24h, range, byCategory, bySourceId, sources] =
+  const [total, positive, last24h, range, byCategory, bySourceId, positiveBySourceId, sources] =
     await Promise.all([
       prisma.article.count(),
       prisma.article.count({ where: { isPositive: true } }),
@@ -38,10 +38,18 @@ async function buildSnapshot(): Promise<StatsSnapshot> {
         _max: { publishedAt: true },
         orderBy: { _count: { id: "desc" } },
       }),
+      prisma.article.groupBy({
+        by: ["sourceId"],
+        where: { isPositive: true },
+        _count: { id: true },
+      }),
       prisma.source.findMany({ select: { id: true, name: true } }),
     ]);
 
   const sourceMap = new Map(sources.map((s) => [s.id, s.name]));
+  const positiveCountBySource = new Map(
+    positiveBySourceId.map((row) => [row.sourceId, row._count.id])
+  );
   const rejectionRate =
     total > 0 ? Math.round(((total - positive) / total) * 100) / 100 : 0;
 
@@ -58,11 +66,16 @@ async function buildSnapshot(): Promise<StatsSnapshot> {
     byCategory: Object.fromEntries(
       byCategory.map((row) => [row.category, row._count.id])
     ),
-    bySources: bySourceId.map((row) => ({
-      name: sourceMap.get(row.sourceId) ?? "(unknown)",
-      count: row._count.id,
-      lastArticle: row._max.publishedAt ?? null,
-    })),
+    bySources: bySourceId.map((row) => {
+      const positiveCount = positiveCountBySource.get(row.sourceId) ?? 0;
+      const total = row._count.id;
+      return {
+        name: sourceMap.get(row.sourceId) ?? "(unknown)",
+        count: total,
+        rejectionRate: total > 0 ? Math.round(((total - positiveCount) / total) * 100) : 0,
+        lastArticle: row._max.publishedAt ?? null,
+      };
+    }),
   };
 }
 

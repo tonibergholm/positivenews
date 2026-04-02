@@ -28,7 +28,7 @@ interface StatsPayload {
     newest: string | null;
   };
   byCategory: Record<string, number>;
-  bySources: Array<{ name: string; count: number; lastArticle: string | null }>;
+  bySources: Array<{ name: string; count: number; rejectionRate: number; lastArticle: string | null }>;
 }
 
 function formatShortDate(iso: string | null): string {
@@ -217,6 +217,7 @@ export function StatsView() {
               <tr className="bg-secondary/60 border-b border-border text-xs text-muted-foreground">
                 <th className="text-left px-4 py-2.5 font-medium">Source</th>
                 <th className="text-right px-4 py-2.5 font-medium">Articles</th>
+                <th className="text-right px-4 py-2.5 font-medium hidden sm:table-cell">Rejected</th>
                 <th className="text-right px-4 py-2.5 font-medium hidden sm:table-cell">
                   Last article
                 </th>
@@ -235,6 +236,11 @@ export function StatsView() {
                   </td>
                   <td className="px-4 py-3 text-right text-muted-foreground tabular-nums">
                     {src.count.toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3 text-right text-xs tabular-nums hidden sm:table-cell">
+                    <span className={src.rejectionRate >= 70 ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground"}>
+                      {src.rejectionRate}%
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-right text-xs text-muted-foreground tabular-nums whitespace-nowrap hidden sm:table-cell">
                     <time dateTime={src.lastArticle ?? undefined}>
