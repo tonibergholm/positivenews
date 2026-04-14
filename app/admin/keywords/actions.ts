@@ -66,8 +66,11 @@ export async function addKeyword(
     await prisma.learnedKeyword.create({
       data: { keyword: trimmed, language, active: true, hits: 0, uniqueIps: 0 },
     });
-  } catch {
-    return { error: "Keyword already exists" };
+  } catch (e) {
+    if ((e as { code?: string }).code === "P2002") {
+      return { error: "Keyword already exists" };
+    }
+    throw e;
   }
 
   await invalidateKeywordCaches();
