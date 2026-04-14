@@ -23,7 +23,7 @@ async function getKeywordData() {
       where: { active: false, lastHitAt: { lt: thirtyDaysAgo } },
       orderBy: { lastHitAt: "asc" },
     }),
-    getLlmCandidates(),
+    getLlmCandidates().catch((): { keyword: string; count: number }[] => []),
   ]);
 
   return { pending, active, stale, llmCandidates };

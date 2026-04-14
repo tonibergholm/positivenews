@@ -9,7 +9,7 @@
 import { prisma } from "./prisma";
 import { extractKeywords } from "./keywords";
 
-export interface LlmCandidate {
+interface LlmCandidate {
   keyword: string;
   count: number;
 }
@@ -21,16 +21,22 @@ export async function getLlmCandidates(
 ): Promise<LlmCandidate[]> {
   const since = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000);
 
-  const rejections = await prisma.article.findMany({
-    where: {
-      isPositive: false,
-      rejectionPass: { in: [1, 2] },
-      rejectionReason: { not: null },
-      createdAt: { gte: since },
-    },
-    select: { rejectionReason: true },
-    take: 500,
-  });
+  const [rejections, existingRows] = await Promise.all([
+    prisma.article.findMany({
+      where: {
+        isPositive: false,
+        rejectionPass: { in: [1, 2] },
+        rejectionReason: { not: null },
+        createdAt: { gte: since },
+      },
+      select: { rejectionReason: true },
+      orderBy: { createdAt: "desc" },
+      take: 500,
+    }),
+    prisma.learnedKeyword.findMany({ select: { keyword: true } }),
+  ]);
+
+  const existing = new Set(existingRows.map((k) => k.keyword));
 
   const termCounts = new Map<string, number>();
   for (const { rejectionReason } of rejections) {
@@ -40,11 +46,6 @@ export async function getLlmCandidates(
       termCounts.set(term, (termCounts.get(term) ?? 0) + 1);
     }
   }
-
-  const existing = new Set(
-    (await prisma.learnedKeyword.findMany({ select: { keyword: true } }))
-      .map((k) => k.keyword)
-  );
 
   return [...termCounts.entries()]
     .filter(([term, count]) => count >= minCount && !existing.has(term))
