@@ -9,7 +9,7 @@
 import { prisma } from "./prisma";
 import { extractKeywords } from "./keywords";
 
-interface LlmCandidate {
+export interface LlmCandidate {
   keyword: string;
   count: number;
 }

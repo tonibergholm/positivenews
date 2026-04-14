@@ -22,4 +22,5 @@ export async function unrejectArticle(id: string): Promise<void> {
     },
   });
   revalidatePath("/admin/rejections");
+  revalidatePath("/");
 }

@@ -21,4 +21,5 @@ export async function unflagArticle(id: string): Promise<void> {
     },
   });
   revalidatePath("/admin/flagged");
+  revalidatePath("/");
 }

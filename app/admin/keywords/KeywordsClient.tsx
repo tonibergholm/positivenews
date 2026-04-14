@@ -3,11 +3,7 @@
 
 import { useState, useTransition } from "react";
 import { activateKeyword, deactivateKeyword, deleteKeyword, addKeyword } from "./actions";
-
-interface LlmCandidate {
-  keyword: string;
-  count: number;
-}
+import type { LlmCandidate } from "@/src/lib/llm-candidates";
 
 interface Keyword {
   id: string;
