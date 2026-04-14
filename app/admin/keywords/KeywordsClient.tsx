@@ -46,7 +46,7 @@ function MutationButton({
 
   return (
     <button
-      onClick={() => startTransition(action)}
+      onClick={() => startTransition(() => { void action(); })}
       disabled={isPending}
       className={`rounded border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${styles[variant]}`}
     >
