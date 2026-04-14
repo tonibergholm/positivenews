@@ -1,8 +1,8 @@
 // app/admin/keywords/KeywordsClient.tsx
 "use client";
 
-import { useTransition } from "react";
-import { activateKeyword, deactivateKeyword, deleteKeyword } from "./actions";
+import { useState, useTransition } from "react";
+import { activateKeyword, deactivateKeyword, deleteKeyword, addKeyword } from "./actions";
 
 interface Keyword {
   id: string;
@@ -28,7 +28,7 @@ function MutationButton({
   label,
   variant,
 }: {
-  action: () => Promise<void>;
+  action: () => Promise<unknown>;
   label: string;
   variant: "primary" | "danger" | "ghost";
 }) {
@@ -172,5 +172,55 @@ export function StaleTable({ keywords }: { keywords: Keyword[] }) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+export function AddKeywordForm() {
+  const [keyword, setKeyword] = useState("");
+  const [language, setLanguage] = useState("en");
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    startTransition(async () => {
+      const result = await addKeyword(keyword, language);
+      if (result?.error) {
+        setError(result.error);
+      } else {
+        setKeyword("");
+      }
+    });
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex items-center gap-2 mb-6">
+      <input
+        type="text"
+        value={keyword}
+        onChange={(e) => setKeyword(e.target.value)}
+        placeholder="Add keyword…"
+        className="flex-1 rounded border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        disabled={isPending}
+      />
+      <select
+        value={language}
+        onChange={(e) => setLanguage(e.target.value)}
+        className="rounded border border-border bg-background px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        disabled={isPending}
+      >
+        <option value="en">EN</option>
+        <option value="fi">FI</option>
+      </select>
+      <button
+        type="submit"
+        disabled={isPending || !keyword.trim()}
+        className="rounded border border-transparent bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+      >
+        {isPending ? "…" : "Add"}
+      </button>
+      {error && <span className="text-xs text-rose-500">{error}</span>}
+    </form>
   );
 }

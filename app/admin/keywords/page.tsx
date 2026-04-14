@@ -1,6 +1,6 @@
 // app/admin/keywords/page.tsx
 import { prisma } from "@/src/lib/prisma";
-import { PendingTable, ActiveTable, StaleTable } from "./KeywordsClient";
+import { PendingTable, ActiveTable, StaleTable, AddKeywordForm } from "./KeywordsClient";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +37,13 @@ export default async function KeywordsPage() {
         <p className="text-sm text-muted-foreground">
           Learned from user flags. Activate to add to filter, deactivate to remove.
         </p>
+      </div>
+
+      <div className="mb-8">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
+          Add keyword
+        </p>
+        <AddKeywordForm />
       </div>
 
       {pending.length > 0 && (

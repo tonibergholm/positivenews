@@ -52,3 +52,24 @@ export async function deleteKeyword(id: string) {
   await invalidateKeywordCaches();
   revalidatePath("/admin/keywords");
 }
+
+export async function addKeyword(
+  keyword: string,
+  language: string
+): Promise<{ error: string } | undefined> {
+  await requireAdmin();
+  const trimmed = keyword.trim().toLowerCase();
+  if (!trimmed) return { error: "Keyword cannot be empty" };
+  if (language !== "en" && language !== "fi") return { error: "Invalid language" };
+
+  try {
+    await prisma.learnedKeyword.create({
+      data: { keyword: trimmed, language, active: true, hits: 0, uniqueIps: 0 },
+    });
+  } catch {
+    return { error: "Keyword already exists" };
+  }
+
+  await invalidateKeywordCaches();
+  revalidatePath("/admin/keywords");
+}
