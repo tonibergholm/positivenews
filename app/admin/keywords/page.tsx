@@ -1,6 +1,7 @@
 // app/admin/keywords/page.tsx
 import { prisma } from "@/src/lib/prisma";
-import { PendingTable, ActiveTable, StaleTable, AddKeywordForm } from "./KeywordsClient";
+import { getLlmCandidates } from "@/src/lib/llm-candidates";
+import { PendingTable, ActiveTable, StaleTable, AddKeywordForm, LlmCandidatesSection } from "./KeywordsClient";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,7 @@ async function getKeywordData() {
   const minIps = parseInt(process.env.KEYWORD_MIN_IPS ?? "2", 10);
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-  const [pending, active, stale] = await Promise.all([
+  const [pending, active, stale, llmCandidates] = await Promise.all([
     prisma.learnedKeyword.findMany({
       where: { active: false, hits: { gte: minHits }, uniqueIps: { gte: minIps } },
       orderBy: { hits: "desc" },
@@ -22,13 +23,14 @@ async function getKeywordData() {
       where: { active: false, lastHitAt: { lt: thirtyDaysAgo } },
       orderBy: { lastHitAt: "asc" },
     }),
+    getLlmCandidates(),
   ]);
 
-  return { pending, active, stale };
+  return { pending, active, stale, llmCandidates };
 }
 
 export default async function KeywordsPage() {
-  const { pending, active, stale } = await getKeywordData();
+  const { pending, active, stale, llmCandidates } = await getKeywordData();
 
   return (
     <div className="max-w-3xl">
@@ -45,6 +47,8 @@ export default async function KeywordsPage() {
         </p>
         <AddKeywordForm />
       </div>
+
+      <LlmCandidatesSection candidates={llmCandidates} />
 
       {pending.length > 0 && (
         <div className="mb-8">

@@ -4,6 +4,11 @@
 import { useState, useTransition } from "react";
 import { activateKeyword, deactivateKeyword, deleteKeyword, addKeyword } from "./actions";
 
+interface LlmCandidate {
+  keyword: string;
+  count: number;
+}
+
 interface Keyword {
   id: string;
   keyword: string;
@@ -222,5 +227,56 @@ export function AddKeywordForm() {
       </button>
       {error && <span className="text-xs text-rose-500">{error}</span>}
     </form>
+  );
+}
+
+export function LlmCandidatesSection({ candidates }: { candidates: LlmCandidate[] }) {
+  if (candidates.length === 0) return null;
+
+  return (
+    <div className="mb-8">
+      <div className="flex items-center gap-2 mb-3">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+          LLM-derived candidates
+        </p>
+        <span className="bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800 rounded-full px-2 py-0.5 text-[10px] font-semibold">
+          {candidates.length}
+        </span>
+      </div>
+      <p className="text-xs text-muted-foreground mb-3">
+        Terms extracted from recent LLM rejection reasons (English only, ≥3 appearances).
+      </p>
+      <div className="rounded-lg border border-border overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-secondary/60 border-b border-border text-xs text-muted-foreground">
+              <th className="text-left px-4 py-2.5 font-medium">Term</th>
+              <th className="text-right px-4 py-2.5 font-medium">Appearances</th>
+              <th className="text-right px-4 py-2.5 font-medium"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {candidates.map((c, i) => (
+              <tr
+                key={c.keyword}
+                className={`border-b border-border/60 last:border-0 ${i % 2 === 0 ? "" : "bg-background/50"}`}
+              >
+                <td className="px-4 py-3 font-mono text-xs font-medium">{c.keyword}</td>
+                <td className="px-4 py-3 text-right tabular-nums text-muted-foreground text-xs">
+                  {c.count}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <MutationButton
+                    action={() => addKeyword(c.keyword, "en")}
+                    label="Add to filter"
+                    variant="primary"
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
