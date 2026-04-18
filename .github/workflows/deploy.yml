@@ -1,0 +1,50 @@
+name: Test & Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      # Uncomment when tests are added (sub-projects B/C/D):
+      # - name: Test
+      #   run: pnpm test
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: bergholm.net
+          port: 2222
+          username: toni
+          key: ${{ secrets.SSH_DEPLOY_KEY }}
+          script: |
+            set -e
+            cd /home/toni/apps/positivenews
+            git pull origin main
+            pnpm install --frozen-lockfile
+            pnpm build
+            pm2 restart positivenews
