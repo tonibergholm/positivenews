@@ -69,7 +69,17 @@ export default function RootLayout({
 
         <footer className="border-t border-border/60 py-6 text-center text-xs text-muted-foreground">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
-            <span>PositiveNews — aggregating constructive journalism</span>
+            <span>
+              PositiveNews — aggregating constructive journalism
+              {process.env.NEXT_PUBLIC_BUILD_SHA && (
+                <span className="ml-2 font-mono opacity-50">
+                  {process.env.NEXT_PUBLIC_BUILD_SHA}
+                  {process.env.NEXT_PUBLIC_BUILD_DATE && (
+                    <> · {new Date(process.env.NEXT_PUBLIC_BUILD_DATE).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })} UTC</>
+                  )}
+                </span>
+              )}
+            </span>
             <span className="hidden sm:inline text-border">|</span>
             <nav className="flex items-center gap-3">
               <Link href="/sources" className="hover:text-foreground transition-colors">
