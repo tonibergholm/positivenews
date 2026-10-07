@@ -31,56 +31,89 @@ The label store (PR #4) holds about 50k judgements. It has plenty of rejects (13
 
 ## Phase 1: data
 
-### Questions
+### Available labels (production, 2026-10-07)
+
+| Source | Articles |
+|---|---|
+| Keyword rejects | 13,701 |
+| Ollama rejects (eligible) | 4,032 |
+| Reader flags | 123 |
+| Ollama keeps (eligible, recorded since 2026-10-07) | 4 |
+| Trusted-source articles | 3,943 |
+| Historical Ollama keeps (ineligible in the label store) | ~32,900 |
+| Jev evaluations (keep by Jev's rule: 80) | 715 |
+| Admin decisions | 0 (growing ~20/day) |
+
+Keeps are scarce. Without historical keeps, every keep example would come from trusted sources, and Laya would learn those outlets' house style. Historical keeps are therefore included at low weight.
+
+### Questions and contract
 
 | Id | Type | Instructions | Options |
 |---|---|---|---|
 | `keep` | noul | "Does this article belong in a positive news feed: genuinely uplifting, hopeful or constructive news?" | false = reject, true = keep |
-| `reason` | choice | "Which topic is this article mainly about?" | the 17 Jev category keys (`cat_*`) with their labels as descriptions, plus `none: "None of these; an ordinary positive story"` |
+| `reason` | choice | "Which of these is the main reason this article does not belong in a positive news feed?" | the 17 Jev category keys (`cat_*`), each described by its label and `yes` text from `src/lib/jev.ts` |
 
-State is `buildState({ title, summary })` from `src/lib/jev.ts` (title plus trimmed summary of at most 300 characters). It is the same at training and inference.
+- State is `buildState({ title, summary })` from `src/lib/jev.ts`, identical at training and inference.
+- The questions, the state format and `LAYA_CONTRACT_VERSION = "1"` form the **contract**. `src/lib/laya.ts` exports it, together with `contractHash()` (sha256 of the canonical JSON). The export writes `contract.json` into every training run, and it is bundled with the checkpoint.
+- The serving client sends the contract's questions and refuses to evaluate when the served checkpoint's contract hash differs from its own.
 
-### Keep targets (soft probabilities)
+### One supervision result per article
 
-The target probability for the label is `0.5 + 0.5 × weight`:
+For each article the export computes a single `{ label, p, source }`, and only then derives question targets. Sources are listed in precedence order; the first match wins:
 
-| Source (first match wins, in this order) | Label | Weight | `keep.true` target |
+| # | Source | Label | Target p(keep) |
 |---|---|---|---|
-| Current admin authority | its verdict | 1.0 | 1.0 or 0.0 |
-| Reader flag (eligible, no admin authority) | reject | 0.5 | 0.25 |
-| Live eligible Ollama event | its verdict | 0.4 | 0.70 or 0.30 |
-| Keyword reject | reject | 0.3 | 0.35 |
-| Trusted-source article (no events by design) | keep | 0.3 | 0.65 |
-| Historical Ollama keep (`historical approval (unverified)`, ineligible in the label store) | keep | 0.2 | 0.60 |
+| 1 | Current admin authority (gold) | its verdict | 1.0 or 0.0 |
+| 2 | Reader flag (eligible), no admin authority | reject | 0.25 |
+| 3 | Jev teacher: a `JevEvaluation` for the current `QUESTION_SET`, label from `deriveVerdict` (Jev's own rule) | keep or reject | 0.80 or 0.20 |
+| 4 | Latest eligible Ollama event, live or backfilled | its verdict | 0.70 or 0.30 |
+| 5 | Keyword reject | reject | 0.35 |
+| 6 | Trusted-source article | keep | 0.65 |
+| 7 | Historical Ollama keep (`historical approval (unverified)`) | keep | 0.60 |
 
-**Jev as teacher, applied after the table.** If the article has a `JevEvaluation` for the current `QUESTION_SET` and its tier is below gold, the Jev keep probability `pJ = min(positiveP, upliftingP, 1 − topCategoryP)` replaces the target. A gold label is never overridden.
-
-Weights are named constants in `src/lib/laya-export.ts` (`LAYA_WEIGHTS`). They are provisional: piece 3 recalibrates them from scoreboard precision.
+- Targets are `0.5 ± 0.5 × weight`, with weights gold 1.0, flag 0.5, Jev 0.6, Ollama 0.4, keyword 0.3, trusted 0.3 and historical 0.2. They are named constants (`LAYA_WEIGHTS`), provisional until piece 3 calibrates them.
+- Reader flags rank above the Jev teacher, as in the label store.
+- Jev-evaluated articles without any other label become rows through source 3.
 
 ### Reason targets
 
-The `reason` question is trained only on rejects:
-- An admin reject with a category gives a hard target on that category.
-- A Jev-evaluated article whose resolved label is reject gets Jev's category Noul probabilities, normalised over the 17 categories, as a soft target.
-- Other rejects carry no `reason` target. Ollama's free-text reasons are not mapped to categories.
-- Keeps get a `none` target only from admin keeps (hard) or Jev-evaluated keeps (soft, `none` = 1 − max category probability, renormalised).
+The `reason` question is labelled **only** for articles whose supervision is a gold admin reject with a category. The target is a hard one-hot on that category.
 
-### Split and balance
+Every other row carries no `gold.reason`. The pinned trainer skips questions a row doesn't label (`laya/train.py`: rows "simply do not label them"). No `none` option and no Jev-derived category targets exist in phase 1.
 
-- **Test cohort:** `isTestCohort(articleId)` articles are never in `train.jsonl`. `test.jsonl` contains only cohort articles with gold (admin) labels, with hard targets.
-- **Balance:** all gold, flag, Jev-taught and live-Ollama rows are kept. Weak keyword rejects, trusted-source keeps and historical keeps are sampled down with a fixed seed so the expected keep and reject mass in `train.jsonl` is within 40–60% each. Without that cap, at most 20k rows are written per source group.
-- **Language:** rows carry `language` for per-language evaluation. Training ignores it.
+At inference `reason` is asked for every article, but it is only meaningful when `keepP < 0.5`.
+
+### Splits
+
+- **Test (`test.jsonl`):** cohort articles (`isTestCohort`) with gold labels. It is never used for training, epoch choice or the deploy gate, and is only reported.
+- **Validation (`val.jsonl`):** a seeded 10% of non-cohort rows, stratified by label and source. It is used for `--eval` during training and for the deploy gate.
+- **Train (`train.jsonl`):** the rest of the non-cohort rows.
+- Cohort articles never appear in train or validation.
+
+### Balance (best effort)
+
+- Rows are balanced by **hard-label count** (keep rows vs reject rows), not by probability mass.
+- All rows from sources 1–4 are kept. Sources 5, 6 and 7 are sampled with a fixed seed. Rejects (keyword) are sampled down to match keeps. Historical keeps are sampled up to the trusted-source count, so both keep styles are equally represented.
+- If the 40–60% keep share can't be reached, the export proceeds and records `balance: "infeasible"` with the reason in the manifest. Both hard-label counts and the mean target mass are always reported.
 
 ### Export
 
-`pnpm laya:export --out <dir> [--distill] [--seed N]`, implemented in `src/lib/laya-export.ts` (pure mapping, tested) and `scripts/laya-export.ts` (DB access). It reads the database directly, not `labels:export`, because trusted-source articles and historical keeps aren't in the label export. It writes:
-- `train.jsonl`: Laya rows `{ id, state, language, questions, gold }`
-- `test.jsonl`: the same shape
-- `manifest.json`: export id (timestamp plus short hash of the row ids), counts by source, label, language and split, the `QUESTION_SET` and the weights used
+`pnpm laya:export --out <dir> [--distill] [--seed N]`. The mapping is pure, in `src/lib/laya-export.ts` and unit-tested. DB access is in `scripts/laya-export.ts`. It reads the database directly, under a fixed event cutoff (the start time), because trusted-source and historical keeps aren't in the label export.
 
-Rows use Laya's `gold` schema: `gold.keep.probabilities = { true: p, false: 1 − p }`, and `gold.reason.probabilities = { <option>: p, ... }`.
-
----
+It writes:
+- `train.jsonl`, `val.jsonl`, `test.jsonl`: Laya rows `{ id, state, language, questions, gold }`, using Laya's gold schema. For example `gold.keep.probabilities = { true: p, false: 1 − p }`.
+- `test-compare.jsonl`: for each test article, its eligible Ollama verdict, its Jev verdict (with model and question set), or `null` where there is no coverage.
+- `contract.json`.
+- `manifest.json`:
+  - the export id
+  - the event cutoff
+  - the sha256 of each data file
+  - the contract hash
+  - `QUESTION_SET`
+  - weights and seed
+  - counts by source, label, language and split
+  - the balance status
+  - the training article ids (`train-ids.txt` alongside)
 
 ## Training on minos
 
@@ -95,39 +128,63 @@ Rows use Laya's `gold` schema: `gold.keep.probabilities = { true: p, false: 1 �
    - Mains power.
    - Prune old checkpoints to keep the newest 2.
 2. **Fetch:** run `pnpm laya:export` on the server over SSH into a temp directory, then `rsync` it into `~/laya-positivenews/data/<export-id>/`.
-3. **Train:** `caffeinate -i uv run laya-train --data train.jsonl --eval test.jsonl --base convaiinnovations/laya-multilingual --loss soft-ce --epochs E --micro-batch M --grad-accum G --out checkpoints/<date>-<export-id>/`.
+3. **Train:** `caffeinate -i uv run laya-train --data train.jsonl --eval val.jsonl --base convaiinnovations/laya-multilingual --loss soft-ce --epochs E --micro-batch M --grad-accum G --out checkpoints/<date>-<export-id>/`.
    - E, M and G come from a timing run (`--timing`: 200 rows, 1 epoch) and are recorded in `train.env`.
 4. **Evaluate:** `uv run python laya/evaluate.py` scores the new checkpoint and the untuned base on `test.jsonl` and writes `report.json` plus `report.md`.
 5. Print the report path. Deploying is a separate, explicit step.
 
 ### Evaluation report (`laya/evaluate.py`)
-- **Overall, FI and EN:** n, accuracy, reject precision, reject recall, ECE (10 bins) on `keep`, plus `reason` top-1 accuracy on rejects that have a category.
-- Jev and Ollama verdicts on the same test articles, from the export, for comparison.
-- **Flag "indicative only"** when the test set has fewer than 50 rows.
-- **Deploy gate:** `gate: pass` when the checkpoint's keep accuracy is at least the base model's, or the test set has fewer than 50 rows. Otherwise `gate: fail`, and `laya-deploy.sh` refuses unless given `--force`.
+- **On validation (gate) and test (report only),** overall, FI and EN:
+  - n
+  - accuracy and **balanced accuracy**
+  - reject precision and recall
+  - ECE (10 bins) on `keep`
+  - the **majority-class baseline**
+  - `reason` top-1 accuracy on rejects that have a category
+- **Test only:** Jev and Ollama verdicts from `test-compare.jsonl`, with their coverage.
+- **Gate (on validation):**
+  - `pass` when balanced accuracy beats both the base model and the majority baseline by at least 0.02.
+  - `experimental` when validation has fewer than 200 rows or test has fewer than 50. Deploying an experimental checkpoint requires `--experimental`, and the scoreboard caption shows it.
+  - Otherwise `fail`. `laya-deploy.sh` refuses unless given `--force`.
+- **Test numbers are never used to pick epochs or checkpoints.** With 0 admin decisions today, the first checkpoint's test set is empty, so the report says so.
 
 ---
 
 ## Serving on bergholm.net
 
-- **Folder:** `~/apps/laya` on the server, with `uv`, Python 3.12, and the same pinned `laya` version.
-- **Wrapper:** `laya/serve.py`, kept in the repo and copied by deploy. It builds a `Router(models={"positivenews": "<checkpoints>/current"})` and exposes:
-  - `POST /v1/systemone` and `POST /v1/systemone/batch` (max 16 states), with Jev-compatible request and response shapes
-  - `GET /health`, returning the checkpoint id and the device
-- **Binding and process:** listens on `127.0.0.1:8100` only, run by pm2 as `laya` with `LAYA_THREADS=2`. The model stays resident (~1.3 GB RAM).
-- **Checkpoints:** `~/apps/laya/checkpoints/<id>/`, with `current` as a symlink.
+**Releases.** Each deploy creates an immutable release directory, `~/apps/laya/releases/<release-id>/`, holding:
+- `checkpoint/`
+- `contract.json`
+- `serve.py`
+- `pyproject.toml` and `uv.lock`, with its own `.venv` created by `uv sync --frozen`
 
-`laya-deploy.sh` runs on minos:
-1. Check the gate.
-2. Rsync the checkpoint plus `serve.py`.
-3. Switch the symlink atomically (`ln -sfn`, then `mv -T`).
-4. `pm2 restart laya`.
-5. Smoke-test `/health` and one `/v1/systemone` request. If the smoke test fails, roll back the symlink and restart.
-6. Keep the 3 newest checkpoints on the server.
+`~/apps/laya/current` is a symlink to the active release, and `~/apps/laya/last-good` is a text file naming the last release that passed the smoke test.
 
-Rollback is `laya-deploy.sh --rollback`, which points `current` at the previous checkpoint.
+**`laya/serve.py`** builds `Router(models={"positivenews": "<release>/checkpoint"})` and serves:
+- `POST /v1/systemone` and `POST /v1/systemone/batch` (max 8 states), with Jev-compatible shapes. The response's `model` field is the release's checkpoint id, so every answer carries the identity of the model that produced it.
+- `GET /health`, returning the checkpoint id, the contract hash, the device, the process RSS and the in-flight request count.
+- Inference runs serially, one request at a time, with a lock in the wrapper. `torch.set_num_threads(2)`. Requests beyond a queue of 4 get 503 with `Retry-After`, so client timeouts can't pile up work.
 
----
+It listens on `127.0.0.1:8100` only. pm2 runs it as `laya`: `cwd` is `~/apps/laya/current`, and the command is `.venv/bin/python serve.py`. pm2 resolves the symlink at start, so a restart picks up the new release.
+
+**`laya-deploy.sh`** runs on minos:
+1. Check the gate status (`pass`, or `experimental` together with `--experimental`, or `--force`).
+2. Rsync the release to a new release directory, then run `uv sync --frozen` there.
+3. Switch atomically: `ln -s <release> current.tmp && mv -T current.tmp current`.
+4. Start or restart: `pm2 describe laya && pm2 restart laya || pm2 start …` (first deploy). Then `pm2 save`.
+5. Smoke-test `/health` (contract hash matches, model loaded) and one `/v1/systemone` request.
+   - On failure, switch `current` back to `last-good` and restart.
+   - On success, write `last-good`.
+6. Keep `last-good`, `current` and the 2 newest other releases, and prune the rest.
+
+**Rollback.** `laya-deploy.sh --rollback <release-id>` switches to a named release, defaulting to `last-good`.
+
+**Benchmark before shadow traffic.** After the first deploy, `laya/bench.sh` sends 50 single and 10 batch-of-8 requests while Ollama is loaded. It records p50/p95 latency and peak RSS. Shadow traffic is enabled (`LAYA_URL` set) only if all three hold:
+- p95 for a batch of 8 is under 20 s
+- peak RSS is under 2.5 GB
+- free memory stays above 1 GB
+
+The client timeout is set to 2× the measured p95, with a minimum of 15 s.
 
 ## Shadow step
 
@@ -151,28 +208,32 @@ Rollback is `laya-deploy.sh --rollback`, which points `current` at the previous 
   ```
 
   `Article` gets `layaEvaluations LayaEvaluation[]`. `scripts/cleanup.ts` also keeps articles that have Laya evaluations.
-- **Client:** `src/lib/laya.ts` holds the question definitions (shared with the export, so training and inference questions are identical) and the client. It posts to `${LAYA_URL}/v1/systemone/batch` with a 10-second timeout and a configured checkpoint id from `/health`, and parses and validates the answers: `keepP` must be in [0, 1] and `reason` must be one of the options.
+- **Client:** `src/lib/laya.ts` holds the contract (questions and state) and the client.
+  - Each run first calls `/health` and skips the run with a warning if the contract hash differs from its own.
+  - It posts batches to `${LAYA_URL}/v1/systemone/batch`, with the timeout from the benchmark, and stores the checkpoint id from each **response's** `model` field, never from `/health`.
+  - It validates answers: `keepP` must be in [0, 1] and `reason` must be one of the options.
 - **Step:** `src/lib/laya-shadow.ts` holds `layaShadowEvaluate({ since, limit, budgetMs })`.
   - Candidates: recent non-trusted articles plus test-cohort articles, with no `LayaEvaluation` for the current checkpoint.
-  - Batches of 16, with a 60-second budget.
+  - Batches of 8, serial, within the budget.
   - Duplicates (P2002) are ignored. Errors are logged, never thrown into the pipeline.
-- **Pipeline:** `runPipeline` calls the step after the Jev step, inside a catch-all, only when `LAYA_URL` is set. Limits: 2-day window, 100 articles, `budgetMs` 60000.
+- **Scheduling:** the Laya shadow step is **not** part of `runPipeline`, so it can't extend the pipeline lock. `src/lib/scheduler.ts` runs it on its own node-cron schedule (`7,22,37,52 * * * *`, offset from the pipeline) with an in-process guard against overlap, only when `LAYA_URL` is set. Limits: 2-day window, 80 articles, `budgetMs` 120000.
 - **Backfill:** `pnpm laya:backfill --days 30 --limit 2000` evaluates history for a new checkpoint.
 
 ---
 
 ## Scoreboard
 
-- `src/lib/scoreboard.ts` gains a `laya` source: keep when `keepP ≥ 0.5`. It uses the newest checkpoint that has evaluated the article, and the checkpoint id appears in the table caption.
-- `loadScoreRows` includes the `LayaEvaluation` row for the current checkpoint.
-- Laya appears in both the cohort and targeted tables, with the same columns as Jev and Ollama.
-
----
+- `src/lib/scoreboard.ts` gains a `laya` source: keep when `keepP ≥ 0.5`.
+- **One checkpoint per report:** the checkpoint of the most recent `LayaEvaluation`, which is the one currently served. The caption shows its id, whether it is experimental, and its coverage (n of the table's gold labels it evaluated). Rows from other checkpoints are ignored.
+- **Laya appears only in the random-cohort table.** Cohort articles are never trained on, so these are honest held-out numbers. The targeted table includes articles a checkpoint may have trained on, so Laya is not shown there.
 
 ## Phase 2: Jev distillation
 
 - **Trigger:** the export reports Jev coverage. `--distill` is used once at least 5,000 articles have a `JevEvaluation` for the current `QUESTION_SET`.
-- **What changes:** with `--distill`, each Jev-evaluated row also carries Jev's 20 questions (definitions copied from `src/lib/jev.ts` `QUESTIONS`, by key), with Jev's answers as soft targets. Nouls use `{true: p, false: 1 − p}`. The Score uses its level probabilities.
+- **What changes:**
+  - With `--distill`, each Jev-evaluated row also carries Jev's 20 questions, with Jev's answers as soft targets. The definitions are copied from `src/lib/jev.ts` `QUESTIONS` by key, and are part of contract version 2.
+  - Nouls use `{true: p, false: 1 − p}`.
+  - The Score uses its stored level `probabilities` only when they are present, valid and sum to more than 0. Otherwise the uplift question is omitted for that row. A distribution is never inferred from the scalar score.
 - **Training and serving:** training is unchanged. The serving client keeps asking only `keep` and `reason`. The distilled questions improve the encoder, and can be asked later if useful.
 
 ---
@@ -182,43 +243,51 @@ Rollback is `laya-deploy.sh --rollback`, which points `current` at the previous 
 | Variable | Where | Meaning |
 |---|---|---|
 | `LAYA_URL` | server `.env` | e.g. `http://127.0.0.1:8100`; unset means the shadow step is off |
-| `LAYA_THREADS` | pm2 env for `laya` | torch CPU threads (2) |
+| `LAYA_THREADS` | pm2 env for `laya` | torch CPU threads (2), applied with `torch.set_num_threads` in `serve.py` |
 | `LAYA_PORT`, `LAYA_HOST` | pm2 env for `laya` | `8100`, `127.0.0.1` |
 
 ## Failure handling
 
 | Failure | Behaviour |
 |---|---|
-| Laya down, slow or returning errors | The shadow step logs and skips; 10s request timeout and 60s budget. Ingest and curation are unaffected. |
+| Laya down, slow, returning 503 or errors | The shadow step logs and skips, within the benchmark-derived timeout and 120 s budget. It runs outside `runPipeline`, so the pipeline is unaffected. |
+| Contract hash mismatch | The shadow run is skipped with a warning |
 | Malformed answer | That article gets no row and is retried next run |
-| Checkpoint fails the smoke test | Deploy rolls back automatically |
-| Bad checkpoint discovered later | `laya-deploy.sh --rollback` |
+| Release fails the smoke test | Deploy switches back to `last-good` automatically |
+| Bad release discovered later | `laya-deploy.sh --rollback [release-id]` |
 | minos has under 15 GB free, or is on battery | `train.sh` refuses to start |
 | Training interrupted | Rerun; exports and checkpoints are per-run directories |
 
 ## Testing
 
 - **Unit tests (Vitest), for `laya-export` mapping:**
-  - tier to target
-  - Jev override below gold only
+  - single supervision precedence; flags beat the Jev teacher
+  - the Jev label equals `deriveVerdict`, including category 0.55 with positive/uplifting 0.9 giving keep
+  - targets per source
   - trusted-source and historical keeps
-  - reason targets (admin hard, Jev soft, none)
-  - cohort exclusion from train
-  - the balance cap with a fixed seed
-  - manifest counts
-- **Unit tests (Vitest), for `laya` client parsing and validation**, the shadow step's batching and budget (with an injected fetch), and the scoreboard Laya row.
+  - reason only for categorised gold rejects
+  - cohort articles in neither train nor validation
+  - the seeded, stratified validation split
+  - hard-count balance, and an infeasible balance being reported
+  - manifest counts and hashes
+  - contract hash stability
+- **Unit tests (Vitest)** for:
+  - `laya` client parsing and validation, and the contract-hash refusal
+  - the checkpoint id taken from the response
+  - the shadow step's batching, budget and overlap guard (with an injected fetch)
+  - the scoreboard Laya row: cohort-only, one checkpoint, coverage
 - **Python:** `laya/evaluate.py` metric functions, tested with `pytest` on minos. No model weights needed.
 - **End to end:**
   - a tiny training run on minos (300 rows, 1 epoch)
   - `serve.py` on minos
   - the shadow step from the session machine against the local database, using `LAYA_URL` over Tailscale
-- **On the server:** deploy smoke test, then one shadow run writing rows, then the scoreboard Laya row rendering.
+- **On the server:** the deploy smoke test (including a forced smoke failure that rolls back to `last-good` on a test release), `bench.sh` against the thresholds, one shadow run writing rows, and the scoreboard Laya row rendering.
 
 ## Rollout
 
 1. Merge the export, the client, the shadow step, the schema and the scripts. The deploy migrates. `LAYA_URL` is unset, so nothing runs yet.
-2. Set up minos and run the first training.
-3. Set up `~/apps/laya` on the server, deploy the checkpoint, set `LAYA_URL` and restart the app.
+2. Set up minos and run the first training. The test set is empty until the cohort has gold labels, so the first checkpoint is `experimental`.
+3. Set up `~/apps/laya` on the server, deploy with `--experimental`, then run `bench.sh`. Only if it meets the thresholds, set `LAYA_URL` and restart the app.
 4. Run `pnpm laya:backfill` for history, then let the pipeline keep it current.
 5. Phase 2 once Jev coverage reaches 5,000.
 
