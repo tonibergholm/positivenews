@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
 import { extractKeywords } from "@/src/lib/keywords";
 import redis from "@/src/lib/redis";
+import { recordReaderFlag } from "@/src/lib/article-decisions";
+import { hashReaderIp } from "@/src/lib/reader-identity";
 
 export const dynamic = "force-dynamic";
 
@@ -46,20 +48,16 @@ export async function POST(
     return NextResponse.json({ error: "Article not found" }, { status: 404 });
   }
 
-  if (article.flaggedAt) {
-    return NextResponse.json({ success: true, duplicate: true });
-  }
-
   const language = article.source.language;
   const keywords = extractKeywords(article.title, language);
 
-  await prisma.$transaction(async (tx) => {
-    const result = await tx.article.updateMany({
-      where: { id, flaggedAt: null },
-      data: { isPositive: false, flaggedAt: new Date() },
-    });
+  const readerHash = hashReaderIp(ip);
+  if (readerHash === null) {
+    console.warn("[flag] AUTH_SECRET missing; reader vote recorded without identity");
+  }
 
-    if (result.count === 0 || keywords.length === 0) return;
+  const status = await recordReaderFlag(id, readerHash, async (tx) => {
+    if (keywords.length === 0) return;
 
     // Upsert keywords: increment hits and lastHitAt
     for (const keyword of keywords) {
@@ -102,6 +100,9 @@ export async function POST(
       data: { active: true },
     });
   });
+
+  if (status === "not_found") return NextResponse.json({ error: "Article not found" }, { status: 404 });
+  if (status !== "hidden") return NextResponse.json({ success: true, duplicate: true });
 
   try {
     await redis.del(`learned:keywords:${language}`);

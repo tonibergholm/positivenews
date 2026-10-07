@@ -1,6 +1,7 @@
 import Parser from "rss-parser";
 import { prisma } from "./prisma";
 import { classifyPositive } from "./classifier";
+import { recordKeywordReject } from "./article-decisions";
 import { FEED_SOURCES, type FeedSource } from "@/src/config/sources";
 
 const parser = new Parser({
@@ -108,21 +109,26 @@ async function ingestFeed(feed: FeedSource): Promise<number> {
         ? { positive: true as const }
         : await classifyPositive(safeTitle, summary, feed.language);
 
-      await prisma.article.create({
-        data: {
-          title: safeTitle,
-          url,
-          summary,
-          imageUrl,
-          publishedAt,
-          sourceId,
-          category: feed.category,
-          isPositive: classResult.positive,
-          rejectionReason: classResult.positive
-            ? null
-            : (classResult.reason ?? "keyword filter"),
-          rejectionPass: classResult.positive ? null : 0,
-        },
+      await prisma.$transaction(async (tx) => {
+        const created = await tx.article.create({
+          data: {
+            title: safeTitle,
+            url,
+            summary,
+            imageUrl,
+            publishedAt,
+            sourceId,
+            category: feed.category,
+            isPositive: classResult.positive,
+            rejectionReason: classResult.positive
+              ? null
+              : (classResult.reason ?? "keyword filter"),
+            rejectionPass: classResult.positive ? null : 0,
+          },
+        });
+        if (!classResult.positive) {
+          await recordKeywordReject(tx, created.id, classResult.reason ?? "keyword filter");
+        }
       });
       saved++;
     } catch (error) {

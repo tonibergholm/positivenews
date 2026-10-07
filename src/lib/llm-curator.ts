@@ -5,6 +5,8 @@
  * Pass 2: For positives — is it genuinely uplifting or just marketing fluff?
  */
 
+import type { OllamaOutcome } from "./article-decisions";
+
 const OLLAMA_URL = process.env.OLLAMA_URL ?? "http://127.0.0.1:11434";
 const MODEL = process.env.OLLAMA_MODEL ?? "gemma3:4b";
 
@@ -32,6 +34,7 @@ export interface CurationResult {
   isPositive: boolean;
   reason: string;
   pass: 1 | 2;
+  outcome: OllamaOutcome;
 }
 
 // ── Shared rejection rules (used in both Pass 1 and Pass 2) ──────────
@@ -193,7 +196,7 @@ export async function curateArticles(
       // LLM failed — mark all as positive (fail-open)
       console.warn(`[llm-curator] Pass 1 failed, keeping all articles in batch`);
       for (const a of batch) {
-        results.push({ id: a.id, isPositive: true, reason: "LLM unavailable", pass: 1 });
+        results.push({ id: a.id, isPositive: true, reason: "LLM unavailable", pass: 1, outcome: "unavailable" });
       }
       continue;
     }
@@ -203,13 +206,17 @@ export async function curateArticles(
 
     // Collect rejected and accepted
     const positiveArticles: ArticleInput[] = [];
+    const pass1Missing = new Set<string>();
 
     for (const a of batch) {
       const r = pass1Map.get(a.id);
-      if (!r || r.positive) {
+      if (!r) {
+        pass1Missing.add(a.id);
+        positiveArticles.push(a);
+      } else if (r.positive) {
         positiveArticles.push(a);
       } else {
-        results.push({ id: a.id, isPositive: false, reason: r.reason, pass: 1 });
+        results.push({ id: a.id, isPositive: false, reason: r.reason, pass: 1, outcome: "judged_reject" });
       }
     }
 
@@ -228,7 +235,7 @@ export async function curateArticles(
       // LLM failed — keep all (fail-open)
       console.warn(`[llm-curator] Pass 2 failed, keeping all positives`);
       for (const a of positiveArticles) {
-        results.push({ id: a.id, isPositive: true, reason: "LLM pass 2 unavailable", pass: 2 });
+        results.push({ id: a.id, isPositive: true, reason: "LLM pass 2 unavailable", pass: 2, outcome: "unavailable" });
       }
       continue;
     }
@@ -237,10 +244,18 @@ export async function curateArticles(
 
     for (const a of positiveArticles) {
       const r = pass2Map.get(a.id);
-      if (!r || r.keep) {
-        results.push({ id: a.id, isPositive: true, reason: r?.reason ?? "passed both checks", pass: 2 });
+      if (!r) {
+        results.push({ id: a.id, isPositive: true, reason: "missing result", pass: 2, outcome: "missing_result" });
+      } else if (r.keep) {
+        results.push({
+          id: a.id,
+          isPositive: true,
+          reason: r.reason,
+          pass: 2,
+          outcome: pass1Missing.has(a.id) ? "missing_result" : "judged_keep",
+        });
       } else {
-        results.push({ id: a.id, isPositive: false, reason: r.reason, pass: 2 });
+        results.push({ id: a.id, isPositive: false, reason: r.reason, pass: 2, outcome: "judged_reject" });
       }
     }
   }
