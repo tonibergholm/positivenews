@@ -41,9 +41,9 @@ async function main() {
   let total = 0;
   for (;;) {
     // Each batch locks its candidates first (SKIP LOCKED), so a concurrent admin decision, which
-    // locks the article, can't be cascade-deleted. The locking query already skips kept rows, so
-    // retained articles are never locked; the delete re-checks with a fresh statement.
-    const deleted = await prisma.$transaction(
+    // locks the article, can't be cascade-deleted. The locking query skips rows that are already
+    // kept (a row labelled mid-run may be locked briefly); the delete re-checks with a fresh statement.
+    const { candidates, deleted } = await prisma.$transaction(
       async (tx) => {
         const candidates = await tx.$queryRaw<{ id: string }[]>`
           SELECT a.id FROM "Article" a
@@ -55,15 +55,16 @@ async function main() {
           ORDER BY a.id
           LIMIT ${BATCH}
           FOR UPDATE OF a SKIP LOCKED`;
-        if (candidates.length === 0) return 0;
+        if (candidates.length === 0) return { candidates: 0, deleted: 0 };
         const { count } = await tx.article.deleteMany({
           where: { id: { in: candidates.map((c) => c.id) }, labelEvents: { none: {} }, jevEvaluations: { none: {} } },
         });
-        return count;
+        return { candidates: candidates.length, deleted: count };
       },
       { timeout: 30_000 },
     );
-    if (deleted === 0) break;
+    // Stop only when nothing qualifies; a batch that all gained labels mid-run deletes 0 but isn't the end.
+    if (candidates === 0) break;
     total += deleted;
   }
 
