@@ -83,16 +83,24 @@ export function toRow(a: ArticleSignals, s: Supervision): LayaRow {
   return { id: a.id, state: buildState({ title: a.title, summary: a.summary }), language: a.language, questions: LAYA_QUESTIONS, gold, source: s.source, label: s.label };
 }
 
-export function seededShuffle<T>(xs: T[], seed: number, salt: string): T[] {
-  const key = (i: number) => createHash("sha256").update(`${seed}:${salt}:${i}`).digest("hex");
-  return xs.map((x, i) => ({ x, k: key(i) })).sort((a, b) => (a.k < b.k ? -1 : 1)).map((e) => e.x);
+/** Content-addressed: order depends on each item's stable key, not its position. */
+export function seededShuffle<T>(xs: T[], seed: number, salt: string, keyOf: (x: T) => string): T[] {
+  const key = (x: T) => createHash("sha256").update(`${seed}:${salt}:${keyOf(x)}`).digest("hex");
+  return xs.map((x) => ({ x, k: key(x) })).sort((a, b) => (a.k < b.k ? -1 : 1)).map((e) => e.x);
 }
 
 export interface SplitResult {
   train: LayaRow[];
   val: LayaRow[];
   test: LayaRow[];
-  balance: { status: "ok" | "infeasible"; reason: string | null; keepRows: number; rejectRows: number; meanTarget: number };
+  balance: {
+    status: "ok" | "infeasible";
+    reason: string | null;
+    keepRows: number;
+    rejectRows: number;
+    meanTarget: number;
+    bySource: Record<SupervisionSource, { preCap: number; kept: number }>;
+  };
 }
 
 export function buildSplits(articles: ArticleSignals[], seed: number): SplitResult {
@@ -108,8 +116,10 @@ export function buildSplits(articles: ArticleSignals[], seed: number): SplitResu
     groups[s.source].push(toRow(a, s));
   }
 
-  const cap = (rows: LayaRow[], n: number, salt: string) => seededShuffle(rows, seed, salt).slice(0, Math.min(n, GROUP_CAP));
-  const kept: LayaRow[] = PROTECTED.flatMap((src) => cap(groups[src], Infinity, src));
+  const byId = (r: LayaRow) => r.id;
+  // Protected sources are never capped; only keyword, trusted and historical obey GROUP_CAP.
+  const cap = (rows: LayaRow[], n: number, salt: string) => seededShuffle(rows, seed, salt, byId).slice(0, Math.min(n, GROUP_CAP));
+  const kept: LayaRow[] = PROTECTED.flatMap((src) => groups[src]);
   const trusted = cap(groups.trusted, Infinity, "trusted");
   const historical = cap(groups.historical, trusted.length, "historical");
   const keepsSoFar = [...kept, ...trusted, ...historical].filter((r) => r.label === "keep").length;
@@ -125,15 +135,24 @@ export function buildSplits(articles: ArticleSignals[], seed: number): SplitResu
 
   // Stratified validation split by (label, source).
   const strata = new Map<string, LayaRow[]>();
-  for (const r of rows) strata.set(`${r.label}:${r.source}`, [...(strata.get(`${r.label}:${r.source}`) ?? []), r]);
+  for (const r of rows) {
+    const k = `${r.label}:${r.source}`;
+    const list = strata.get(k);
+    if (list) list.push(r);
+    else strata.set(k, [r]);
+  }
   const val: LayaRow[] = [];
   const train: LayaRow[] = [];
   for (const [key, list] of [...strata.entries()].sort(([a], [b]) => (a < b ? -1 : 1))) {
-    const shuffled = seededShuffle(list, seed, `val:${key}`);
+    const shuffled = seededShuffle(list, seed, `val:${key}`, byId);
     const nVal = Math.round(list.length * VAL_SHARE);
     val.push(...shuffled.slice(0, nVal));
     train.push(...shuffled.slice(nVal));
   }
+
+  const bySource = Object.fromEntries(
+    (Object.keys(groups) as SupervisionSource[]).map((src) => [src, { preCap: groups[src].length, kept: rows.filter((r) => r.source === src).length }]),
+  ) as SplitResult["balance"]["bySource"];
 
   return {
     train,
@@ -145,6 +164,7 @@ export function buildSplits(articles: ArticleSignals[], seed: number): SplitResu
       keepRows,
       rejectRows,
       meanTarget: round(meanTarget),
+      bySource,
     },
   };
 }
