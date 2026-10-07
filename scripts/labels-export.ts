@@ -29,11 +29,23 @@ async function main() {
   if (only !== "test") streams.train = createWriteStream(out);
   if (only !== "train") streams.test = createWriteStream(only === "test" ? out : `${out}.test.jsonl`);
 
+  // A failed write (disk full, bad path) must fail the run, never leave a truncated file behind a success line.
+  let streamError: Error | null = null;
+  for (const [name, s] of Object.entries(streams)) {
+    s!.on("error", (err) => {
+      streamError ??= new Error(`[labels-export] write failed (${name}, ${s!.path}): ${err.message}`);
+    });
+  }
+  const assertStreams = () => {
+    if (streamError) throw streamError;
+  };
+
   const summary: Record<string, number> = {};
   const bump = (k: string) => (summary[k] = (summary[k] ?? 0) + 1);
   let cursor: string | undefined;
 
   for (;;) {
+    assertStreams();
     const batch = await prisma.article.findMany({
       where: { labelEvents: { some: { createdAt: { lt: cutoff } } }, ...(cursor ? { id: { gt: cursor } } : {}) },
       orderBy: { id: "asc" },
@@ -75,13 +87,25 @@ async function main() {
     }
   }
 
-  await Promise.all(Object.values(streams).map((s) => new Promise((r) => s!.end(r))));
+  await Promise.all(
+    Object.values(streams).map(
+      (s) =>
+        new Promise<void>((resolve, reject) => {
+          if (streamError) return reject(streamError);
+          s!.once("finish", resolve);
+          s!.once("error", reject);
+          s!.end();
+        }),
+    ),
+  );
+  assertStreams();
   console.log(`[labels-export] snapshot ${cutoff.toISOString()}`, summary);
   await prisma.$disconnect();
 }
 
 main().catch(async (err) => {
-  console.error("[labels-export] failed:", err);
+  const message = err instanceof Error ? err.message : String(err);
+  console.error(message.startsWith("[labels-export]") ? message : `[labels-export] failed: ${message}`);
   await prisma.$disconnect();
   process.exit(1);
 });
