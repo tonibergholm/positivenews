@@ -210,7 +210,8 @@ export async function curateArticles(
 
     for (const a of batch) {
       const r = pass1Map.get(a.id);
-      if (!r) {
+      // A result without a boolean verdict is not a judgement: treat it like a missing result.
+      if (!r || typeof r.positive !== "boolean") {
         pass1Missing.add(a.id);
         positiveArticles.push(a);
       } else if (r.positive) {
@@ -244,7 +245,7 @@ export async function curateArticles(
 
     for (const a of positiveArticles) {
       const r = pass2Map.get(a.id);
-      if (!r) {
+      if (!r || typeof r.keep !== "boolean") {
         results.push({ id: a.id, isPositive: true, reason: "missing result", pass: 2, outcome: "missing_result" });
       } else if (r.keep) {
         results.push({
