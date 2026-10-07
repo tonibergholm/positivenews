@@ -57,12 +57,12 @@ export const CATEGORIES: Record<string, CategoryDef> = {
   cat_disaster: {
     label: "disaster / accident / death",
     instructions: "Is the article mainly about a disaster, an accident, or someone dying or being hurt?",
-    yes: "Fires, crashes, natural disasters, accidents, water damage, deaths, injuries, or victims, even if the story mentions a silver lining",
+    yes: "Fires, crashes, natural disasters, accidents, water damage, deaths, injuries, animal attacks on people, or victims, even if the story mentions a silver lining",
     no: "Nobody is harmed and no disaster or accident is described",
   },
   cat_sports: {
-    label: "routine sports",
-    instructions: "Is the article mainly a routine sports report rather than a sporting achievement?",
+    label: "routine or negative sports",
+    instructions: "Is the article mainly routine or negative sports news rather than a sporting achievement?",
     yes: "Match results and scores, league standings, transfers, roster moves, contract extensions, coaching changes, retirements, doping, sports lawsuits or misconduct probes",
     no: "A genuine sporting triumph such as winning a title, breaking a record, or overcoming adversity, or not about sport",
   },
@@ -98,7 +98,7 @@ export const CATEGORIES: Record<string, CategoryDef> = {
   },
   cat_health_scare: {
     label: "health scare",
-    instructions: "Is the article mainly a health scare?",
+    instructions: "Is the article mainly about a disease outbreak, a worrying health trend, or someone falling ill?",
     yes: "Disease outbreaks, anti-vaccination trends, declining health statistics, infections, or illness of politicians or public figures",
     no: "Health breakthroughs, practical wellness advice, or not about health",
   },
@@ -111,7 +111,7 @@ export const CATEGORIES: Record<string, CategoryDef> = {
   cat_env_loss: {
     label: "harm to nature or animals",
     instructions: "Is the article mainly about harm to nature or animals?",
-    yes: "Environmental loss or alarm, pollution, species decline, poaching, illegal wildlife trade, hunting or culling of wild animals such as wolf hunting, or animal attacks on people",
+    yes: "Environmental loss or alarm, pollution, species decline, poaching, illegal wildlife trade, hunting or culling of wild animals such as wolf hunting",
     no: "Nature recovering, conservation success, rewilding, or not about nature",
   },
   cat_marketing: {
@@ -145,7 +145,7 @@ export const QUESTIONS: Questions = {
     "Is this article positive news that would leave a reader feeling hopeful, inspired, or calm?",
     {
       true: "Solutions journalism, scientific or medical breakthroughs, kindness or heroism, environmental recovery, genuine cultural or sporting achievements, community successes, practical wellness advice",
-      false: "Conflict, crime, disaster, politics, scandal, alarm, routine sports or business news, shopping, filler, or anything distressing even with a silver lining",
+      false: "Conflict, crime, disaster, political conflict, scandal, alarm, routine sports or business news, shopping, filler, or anything distressing even with a silver lining",
     },
   ),
   uplifting: noul(
