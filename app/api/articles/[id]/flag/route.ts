@@ -4,6 +4,7 @@ import { extractKeywords } from "@/src/lib/keywords";
 import redis from "@/src/lib/redis";
 import { recordReaderFlag } from "@/src/lib/article-decisions";
 import { hashReaderIp } from "@/src/lib/reader-identity";
+import { clientIp } from "@/src/lib/client-ip";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,9 @@ export async function POST(
   }
 
   // Rate limit: 10 flags per IP per minute
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "unknown";
+  // X-Real-IP comes from nginx ($remote_addr). The first X-Forwarded-For entry is client-supplied
+  // and spoofable (it would bypass the limit and mint unlimited reader identities), so it is never used.
+  const ip = clientIp(request.headers);
   const now = Date.now();
   const entry = flagRateMap.get(ip);
   if (!entry || entry.resetAt < now) {
@@ -102,7 +105,8 @@ export async function POST(
   });
 
   if (status === "not_found") return NextResponse.json({ error: "Article not found" }, { status: 404 });
-  if (status !== "hidden") return NextResponse.json({ success: true, duplicate: true });
+  if (status === "duplicate") return NextResponse.json({ success: true, duplicate: true });
+  if (status === "recorded") return NextResponse.json({ success: true, recorded: true });
 
   try {
     await redis.del(`learned:keywords:${language}`);
