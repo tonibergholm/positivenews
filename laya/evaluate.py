@@ -16,18 +16,16 @@ def load(path: Path) -> list[dict]:
 def label_of(row: dict) -> str:
     return "keep" if row["gold"]["keep"]["probabilities"]["true"] >= 0.5 else "reject"
 
-def predict(router: Router, model: str, rows: list[dict]) -> dict[str, float]:
-    out = {}
-    for r in rows:
-        res = router.predict(r["state"], {"keep": r["questions"]["keep"]}, model=model)
-        out[r["id"]] = float(res["answers"]["keep"]["noul"])
-    return out
+def ask(router: Router, model: str, rows: list[dict], questions: dict) -> dict[str, dict]:
+    """Ask every row the full contract questions (keep and reason), exactly as serving does."""
+    return {r["id"]: router.predict(r["state"], questions, model=model)["answers"] for r in rows}
 
-def reason_scores(router: Router, model: str, rows: list[dict]) -> dict:
+def keep_scores(answers: dict[str, dict]) -> dict[str, float]:
+    return {i: float(a["keep"]["noul"]) for i, a in answers.items()}
+
+def reason_scores(answers: dict[str, dict], rows: list[dict]) -> dict:
     sel = [(r, reason_target(r)) for r in rows if reason_target(r) is not None and "reason" in r["questions"]]
-    preds = [router.predict(r["state"], {"reason": r["questions"]["reason"]}, model=model)["answers"]["reason"]["choice"]
-             for r, _ in sel]
-    return reason_metrics(preds, [t for _, t in sel])
+    return reason_metrics([answers[r["id"]]["reason"]["choice"] for r, _ in sel], [t for _, t in sel])
 
 def main():
     ap = argparse.ArgumentParser()
@@ -37,11 +35,14 @@ def main():
     data, ck = Path(a.data), Path(a.checkpoint)
     val = [dict(r, label=label_of(r)) for r in load(data / "val.jsonl")]
     test = [dict(r, label=label_of(r)) for r in load(data / "test.jsonl")]
+    questions = json.loads((data / "contract.json").read_text())["questions"]
     router = Router(models={"positivenews": str(ck), "base": BASE})
     report = {"checkpoint": ck.name, "manifest": json.loads((data / "manifest.json").read_text())}
+    answers = {(name, m): ask(router, m, rows, questions)
+               for name, rows in (("val", val), ("test", test)) for m in ("positivenews", "base")}
     for name, rows in (("val", val), ("test", test)):
-        report[name] = {m: by_language(rows, predict(router, m, rows)) for m in ("positivenews", "base")}
-    report["reason"] = {name: {m: reason_scores(router, m, rows) for m in ("positivenews", "base")}
+        report[name] = {m: by_language(rows, keep_scores(answers[(name, m)])) for m in ("positivenews", "base")}
+    report["reason"] = {name: {m: reason_scores(answers[(name, m)], rows) for m in ("positivenews", "base")}
                         for name, rows in (("val", val), ("test", test))}
     compare = {c["id"]: c for c in load(data / "test-compare.jsonl")} if (data / "test-compare.jsonl").exists() else {}
     report["test_compare"] = {

@@ -57,7 +57,8 @@ def one(body: dict = Body(...)):
         answers = _predict(body["state"], body["questions"])
     finally:
         _release()
-    return {"model": RELEASE["checkpoint"], "experimental": RELEASE.get("experimental", False), "answers": answers}
+    return {"model": RELEASE["checkpoint"], "experimental": RELEASE.get("experimental", False),
+            "contract_hash": CONTRACT["hash"], "answers": answers}
 
 @app.post("/v1/systemone/batch")
 def batch(body: dict = Body(...)):
@@ -69,7 +70,8 @@ def batch(body: dict = Body(...)):
         results = [{"answers": _predict(s, body["questions"])} for s in states]
     finally:
         _release()
-    return {"model": RELEASE["checkpoint"], "experimental": RELEASE.get("experimental", False), "results": results}
+    return {"model": RELEASE["checkpoint"], "experimental": RELEASE.get("experimental", False),
+            "contract_hash": CONTRACT["hash"], "results": results}
 
 if __name__ == "__main__":
     uvicorn.run(app, host=os.environ.get("LAYA_HOST", "127.0.0.1"), port=int(os.environ.get("LAYA_PORT", "8100")), workers=1)
