@@ -16,12 +16,14 @@ const PASS_LABELS: Record<number, string> = {
   0: "Keyword",
   1: "LLM-1",
   2: "LLM-2",
+  3: "Admin",
 };
 
 const PASS_COLORS: Record<number, string> = {
   0: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
   1: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
   2: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
+  3: "bg-secondary text-foreground",
 };
 
 function formatDate(date: Date): string {
