@@ -37,6 +37,9 @@ model Article {
   rejectionPass   Int?
   createdAt       DateTime  @default(now())
   jevEvaluations  JevEvaluation[]
+  labelEvents     LabelEvent[]
+
+  @@index([createdAt])
 }
 
 model LearnedKeyword {
@@ -79,4 +82,26 @@ model JevEvaluation {
   createdAt    DateTime @default(now())
 
   @@unique([articleId, questionSet])
+}
+
+model LabelEvent {
+  id         String   @id @default(cuid())
+  article    Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  articleId  String
+  source     String
+  verdict    String
+  category   String?
+  actor      String?
+  reason     String?
+  pass       Int?
+  eligible   Boolean  @default(true)
+  bucket     String?
+  retractsId String?
+  prevState  Json?
+  dedupeKey  String?  @unique
+  backfilled Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([articleId, createdAt])
+  @@index([source, createdAt])
 }
