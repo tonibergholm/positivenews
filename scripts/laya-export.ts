@@ -7,12 +7,13 @@
  */
 import "./load-env";
 import { createHash } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { prisma } from "../src/lib/prisma";
 import { DEFAULT_THRESHOLDS, deriveVerdict, QUESTION_SET } from "../src/lib/jev";
+import { isTestCohort } from "../src/lib/labels";
 import { contractHash, layaContract } from "../src/lib/laya";
-import { buildSplits, LAYA_WEIGHTS, type ArticleSignals, type LayaRow } from "../src/lib/laya-export";
+import { buildSplits, latestOllama, LAYA_WEIGHTS, type ArticleSignals, type LayaRow } from "../src/lib/laya-export";
 import { FEED_SOURCES } from "../src/config/sources";
 
 const BATCH = 1000;
@@ -33,7 +34,12 @@ async function main() {
     console.error("[laya-export] --distill is phase 2 and not implemented yet");
     process.exit(1);
   }
-  const seed = Number.parseInt(arg("seed") ?? "7", 10);
+  const seedArg = arg("seed") ?? "7";
+  if (!/^-?\d+$/.test(seedArg)) {
+    console.error(`[laya-export] --seed must be an integer, got "${seedArg}"`);
+    process.exit(1);
+  }
+  const seed = Number.parseInt(seedArg, 10);
   const cutoff = new Date();
   const articles: ArticleSignals[] = [];
   const compareInfo = new Map<string, { ollama: string | null; jev: { keep: boolean; model: string; questionSet: string } | null }>();
@@ -41,7 +47,7 @@ async function main() {
 
   for (;;) {
     const batch = await prisma.article.findMany({
-      where: cursor ? { id: { gt: cursor } } : {},
+      where: { createdAt: { lt: cutoff }, ...(cursor ? { id: { gt: cursor } } : {}) },
       orderBy: { id: "asc" },
       take: BATCH,
       select: {
@@ -61,7 +67,8 @@ async function main() {
     for (const a of batch) {
       const jev = a.jevEvaluations[0] ?? null;
       articles.push({ id: a.id, title: a.title, summary: a.summary, language: a.source.language, trusted: trusted.has(a.source.url), events: a.labelEvents, jev });
-      const ollama = a.labelEvents.filter((e) => e.source === "ollama" && e.eligible).sort((x, y) => x.createdAt.getTime() - y.createdAt.getTime()).at(-1);
+      if (!isTestCohort(a.id)) continue;
+      const ollama = latestOllama(a.labelEvents);
       compareInfo.set(a.id, {
         ollama: ollama ? ollama.verdict : null,
         jev: jev ? { keep: deriveVerdict(jev, DEFAULT_THRESHOLDS).keep, model: jev.model, questionSet: QUESTION_SET } : null,
@@ -70,7 +77,9 @@ async function main() {
   }
 
   const r = buildSplits(articles, seed);
-  mkdirSync(out, { recursive: true });
+  const tmp = `${out}.tmp`;
+  rmSync(tmp, { recursive: true, force: true });
+  mkdirSync(tmp, { recursive: true });
   const jsonl = (rows: object[]) => rows.map((x) => JSON.stringify(x)).join("\n") + (rows.length ? "\n" : "");
   const strip = (row: LayaRow) => ({ id: row.id, state: row.state, language: row.language, questions: row.questions, gold: row.gold });
   const files: Record<string, string> = {
@@ -81,7 +90,7 @@ async function main() {
     "contract.json": JSON.stringify({ ...layaContract(), hash: contractHash() }, null, 2),
     "train-ids.txt": r.train.map((x) => x.id).join("\n") + "\n",
   };
-  for (const [name, content] of Object.entries(files)) writeFileSync(join(out, name), content);
+  for (const [name, content] of Object.entries(files)) writeFileSync(join(tmp, name), content);
 
   const sha = (s: string) => createHash("sha256").update(s).digest("hex");
   const count = (rows: LayaRow[], key: "source" | "label" | "language") => rows.reduce<Record<string, number>>((m, x) => ((m[x[key]] = (m[x[key]] ?? 0) + 1), m), {});
@@ -98,7 +107,9 @@ async function main() {
     counts: Object.fromEntries((["train", "val", "test"] as const).map((k) => [k, { total: r[k].length, bySource: count(r[k], "source"), byLabel: count(r[k], "label"), byLanguage: count(r[k], "language") }])),
     files: Object.fromEntries(Object.entries(files).map(([n, c]) => [n, sha(c)])),
   };
-  writeFileSync(join(out, "manifest.json"), JSON.stringify(manifest, null, 2));
+  writeFileSync(join(tmp, "manifest.json"), JSON.stringify(manifest, null, 2));
+  if (existsSync(out)) rmSync(out, { recursive: true, force: true });
+  renameSync(tmp, out);
   console.log(`[laya-export] ${exportId} → ${out}`);
   console.log(JSON.stringify({ balance: r.balance, counts: manifest.counts }, null, 2));
   await prisma.$disconnect();

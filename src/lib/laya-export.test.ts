@@ -86,8 +86,8 @@ describe("buildSplits", () => {
     const xs = Array.from({ length: 200 }, (_, i) => art({ trusted: i % 2 === 0, events: i % 2 ? [ev({ source: "ollama", verdict: "reject" })] : [] }));
     const a = buildSplits(xs, 7), b = buildSplits(xs, 7);
     expect(a.val.map((x) => x.id)).toEqual(b.val.map((x) => x.id));
-    expect(a.val.length).toBeGreaterThanOrEqual(18);
-    expect(a.val.length).toBeLessThanOrEqual(22);
+    expect(a.val.length).toBeGreaterThanOrEqual(10);
+    expect(a.val.length).toBeLessThanOrEqual(30);
   });
   it("seededShuffle is deterministic and seed-sensitive", () => {
     const xs = Array.from({ length: 50 }, (_, i) => i);
@@ -95,14 +95,23 @@ describe("buildSplits", () => {
     expect(seededShuffle(xs, 1, "a", k)).toEqual(seededShuffle(xs, 1, "a", k));
     expect(seededShuffle(xs, 1, "a", k)).not.toEqual(seededShuffle(xs, 2, "a", k));
   });
-  it("adding an unrelated row does not reshuffle existing validation ids", () => {
-    const xs = Array.from({ length: 200 }, (_, i) => art({ trusted: i % 2 === 0, events: i % 2 ? [ev({ source: "ollama", verdict: "reject" })] : [] }));
-    const extra = art({ events: [ev({ source: "ollama", verdict: "reject" })] });
-    const before = new Set(buildSplits(xs, 7).val.map((x) => x.id));
-    const after = new Set(buildSplits([...xs, extra], 7).val.map((x) => x.id));
-    for (const id of before) if (!after.has(id)) expect.fail(`${id} left validation`);
-    const added = [...after].filter((id) => !before.has(id));
-    expect(added.every((id) => id === extra.id)).toBe(true);
+  it("adding rows never moves existing ids between train and val", () => {
+    const mk = (n: number, off: number) => Array.from({ length: n }, (_, i) => art({ trusted: (i + off) % 2 === 0, events: (i + off) % 2 ? [ev({ source: "ollama", verdict: "reject" })] : [] }));
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const base = mk(100, 0);
+      const split = (xs: ArticleSignals[]) => {
+        const r = buildSplits(xs, seed);
+        return { val: new Set(r.val.map((x) => x.id)), train: new Set(r.train.map((x) => x.id)) };
+      };
+      const before = split(base);
+      for (const n of [1, 10, 100]) {
+        const after = split([...base, ...mk(n, 7)]);
+        for (const x of base) {
+          if (before.val.has(x.id)) expect(after.val.has(x.id)).toBe(true);
+          else expect(after.train.has(x.id)).toBe(true);
+        }
+      }
+    }
   });
   it("never caps protected sources and reports per-source counts", () => {
     const ol = Array.from({ length: 25 }, () => art({ events: [ev({ source: "ollama", verdict: "reject" })] }));

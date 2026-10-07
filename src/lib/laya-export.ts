@@ -50,7 +50,7 @@ export function supervise(a: ArticleSignals): Supervision | null {
     const label = deriveVerdict(a.jev, DEFAULT_THRESHOLDS).keep ? "keep" : "reject";
     return { label, p: target(label, LAYA_WEIGHTS.jev), source: "jev", category: null };
   }
-  const ollama = eligible.filter((e) => e.source === "ollama" && (e.verdict === "keep" || e.verdict === "reject")).sort(byTime).at(-1);
+  const ollama = latestOllama(a.events);
   if (ollama) {
     const label = ollama.verdict as "keep" | "reject";
     return { label, p: target(label, LAYA_WEIGHTS.ollama), source: "ollama", category: null };
@@ -87,6 +87,16 @@ export function toRow(a: ArticleSignals, s: Supervision): LayaRow {
 export function seededShuffle<T>(xs: T[], seed: number, salt: string, keyOf: (x: T) => string): T[] {
   const key = (x: T) => createHash("sha256").update(`${seed}:${salt}:${keyOf(x)}`).digest("hex");
   return xs.map((x) => ({ x, k: key(x) })).sort((a, b) => (a.k < b.k ? -1 : 1)).map((e) => e.x);
+}
+
+/** Latest eligible Ollama keep/reject event (time, then id tie-break), as used by supervise. */
+export function latestOllama<E extends Ev>(events: E[]): E | undefined {
+  return events.filter((e) => e.eligible && e.source === "ollama" && (e.verdict === "keep" || e.verdict === "reject")).sort(byTime).at(-1);
+}
+
+function inVal(seed: number, r: LayaRow): boolean {
+  const h = createHash("sha256").update(`${seed}:val:${r.label}:${r.source}:${r.id}`).digest("hex");
+  return Number.parseInt(h.slice(0, 8), 16) / 2 ** 32 < VAL_SHARE;
 }
 
 export interface SplitResult {
@@ -133,22 +143,11 @@ export function buildSplits(articles: ArticleSignals[], seed: number): SplitResu
   const feasible = share >= 0.4 && share <= 0.6;
   const meanTarget = rows.length ? rows.reduce((s, r) => s + r.gold.keep.probabilities.true, 0) / rows.length : 0;
 
-  // Stratified validation split by (label, source).
-  const strata = new Map<string, LayaRow[]>();
-  for (const r of rows) {
-    const k = `${r.label}:${r.source}`;
-    const list = strata.get(k);
-    if (list) list.push(r);
-    else strata.set(k, [r]);
-  }
+  // Validation membership is a per-row hash threshold, so adding rows never moves existing ones.
+  // A row whose label or source changes may move, since both are part of the hash key.
   const val: LayaRow[] = [];
   const train: LayaRow[] = [];
-  for (const [key, list] of [...strata.entries()].sort(([a], [b]) => (a < b ? -1 : 1))) {
-    const shuffled = seededShuffle(list, seed, `val:${key}`, byId);
-    const nVal = Math.round(list.length * VAL_SHARE);
-    val.push(...shuffled.slice(0, nVal));
-    train.push(...shuffled.slice(nVal));
-  }
+  for (const r of rows) (inVal(seed, r) ? val : train).push(r);
 
   const bySource = Object.fromEntries(
     (Object.keys(groups) as SupervisionSource[]).map((src) => [src, { preCap: groups[src].length, kept: rows.filter((r) => r.source === src).length }]),
