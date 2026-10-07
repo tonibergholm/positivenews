@@ -179,6 +179,8 @@ The feed scheduler starts automatically on server boot via the Next.js instrumen
 
 With `TYPESAFE_API_KEY` set, every pipeline run also evaluates recent non-trusted articles with [TypeSafe Jev](https://docs.typesafe.ai) and stores the answers in `JevEvaluation`. Jev does not change what the feed shows. Compare it with the Ollama curator at `/news/admin/jev`.
 
+This feature adds the `JevEvaluation` table. The deploy workflow does not run migrations, so run `npx prisma migrate deploy` on the server before or right after deploying.
+
 ```bash
 pnpm jev:smoke                          # live check of fixed FI/EN headlines
 pnpm jev:backfill --days 30 --limit 500 # evaluate existing articles and print the comparison

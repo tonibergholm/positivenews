@@ -147,7 +147,7 @@ Each evaluated article falls into exactly one group, based on its current `Artic
 | Ollama-kept | `curatedAt` set, `rejectionPass` null | Ollama said keep. Includes articles readers later flagged and admin un-rejects. |
 | Pending | `curatedAt` null, `isPositive = true` | Not curated yet; excluded from agreement |
 
-Reader-flagged articles (`flaggedAt` set) are a subset of Ollama-kept and get their own metric. An article an admin un-rejected counts as Ollama-kept. That is a small known inaccuracy, because the admin overrode Ollama.
+Reader-flagged articles (`flaggedAt` set) are a subset of Ollama-kept and get their own metric. An article an admin un-rejected counts as Ollama-kept. That is a small known inaccuracy, because the admin overrode Ollama. When Ollama is unavailable the curator keeps articles (fail-open) without a distinguishing marker, so those count as Ollama-kept too. During Ollama outages agreement and Jev-rejects disagreements are inflated.
 
 ---
 
@@ -171,7 +171,9 @@ Aggregation is in `src/lib/jev-report.ts`, kept pure so it can be tested: `(rows
 |---|---|
 | `TYPESAFE_API_KEY` missing | Shadow step does nothing; the page shows "no evaluations" |
 | 429 or transient error | SDK retries with backoff. If it still fails, the error is logged and the article is retried next run. |
-| Auth or other 4xx | Logged once per run; the remaining articles in the run are skipped |
+| 401, 403 or 404 (bad key, no permission, unknown model) | Logged once per run; the remaining articles in the run are skipped |
+| 400 or 422 for one article | Logged; that article gets no row and is retried next run |
+| Slow or unavailable API | Shadow step stops starting new articles after a 90-second budget; calls use a 10-second timeout and one retry |
 | Malformed or missing answer | Treated as a failure: no row is written |
 | Any shadow error | Caught in `runPipeline`; ingest and curation results are unaffected |
 
