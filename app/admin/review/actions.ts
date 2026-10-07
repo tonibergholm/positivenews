@@ -2,7 +2,6 @@
 
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import { prisma } from "@/src/lib/prisma";
 import { recordAdminDecision, retractAdminDecision } from "@/src/lib/article-decisions";
 import { CATEGORIES, deriveVerdict, QUESTION_SET } from "@/src/lib/jev";
@@ -20,12 +19,10 @@ async function actor(): Promise<string | null> {
   return session.user?.email ?? null;
 }
 
-// Never revalidate /admin/review here: a server action that revalidates the current route
-// returns the new RSC payload in its response, which re-renders the page and remounts the
-// card, losing the reveal. The client navigates (replace + refresh) after the reveal instead.
-function revalidate() {
-  for (const p of ["/", "/admin/rejections", "/admin/flagged"]) revalidatePath(p);
-}
+// The review actions don't call revalidatePath. In this Next version any revalidatePath call
+// inside a server action re-renders the current route into the action response, which swaps
+// in the next queued card and hides the reveal. Nothing needs it anyway: the admin pages are
+// force-dynamic and the feed reads a force-dynamic API. The client refreshes after the reveal.
 
 async function loadReveal(articleId: string): Promise<Reveal> {
   const [events, jev] = await Promise.all([
@@ -53,7 +50,6 @@ export async function decideAction(articleId: string, verdict: "keep" | "reject"
   try {
     const r = await recordAdminDecision(articleId, verdict, { category, bucket: bucket as ReviewBucket, actor: who });
     if (r.status === "not_found") return { ok: false as const, error: "Article not found" };
-    revalidate();
     return { ok: true as const, eventId: r.eventId, reveal: await loadReveal(articleId) };
   } catch (err) {
     console.error("[review] decide failed:", err);
@@ -67,7 +63,6 @@ export async function undoAction(eventId: string) {
     const r = await retractAdminDecision(eventId, who);
     if (r === "stale") return { ok: false as const, error: "Decision changed elsewhere" };
     if (r === "not_found") return { ok: false as const, error: "Decision not found" };
-    revalidate();
     return { ok: true as const };
   } catch (err) {
     console.error("[review] undo failed:", err);

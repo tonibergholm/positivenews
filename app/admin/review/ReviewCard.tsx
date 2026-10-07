@@ -48,6 +48,7 @@ export function ReviewCardView({ card, categories, skip, more }: Props) {
   const [error, setError] = useState<string | null>(null);
   const canUndo = useSyncExternalStore(subscribeLast, () => readLast() !== null, () => false);
   const busy = useRef(false);
+  const undoing = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mounted = useRef(true);
   const firstChip = useRef<HTMLButtonElement | null>(null);
@@ -117,6 +118,7 @@ export function ReviewCardView({ card, categories, skip, more }: Props) {
   const undo = useCallback(() => {
     // Allowed while busy only during the reveal (decision already saved).
     if (busy.current && !reveal) return;
+    if (undoing.current) return; // one undo at a time
     const last = readLast();
     if (!last) {
       if (sessionStorage.getItem(LAST_KEY)) setLast(null);
@@ -126,6 +128,7 @@ export function ReviewCardView({ card, categories, skip, more }: Props) {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
     busy.current = true;
+    undoing.current = true;
     setError(null);
     startTransition(async () => {
       try {
@@ -146,11 +149,15 @@ export function ReviewCardView({ card, categories, skip, more }: Props) {
         busy.current = false;
         if (timer.current) clearTimeout(timer.current);
         timer.current = null;
-        go({ focus: last.articleId });
+        // Navigate outside this transition. Called inside it, router.replace + refresh
+        // fetched the new page but never committed it, leaving `pending` stuck true.
+        setTimeout(() => go({ focus: last.articleId }), 0);
       } catch {
         setError(TRANSIENT);
         busy.current = wasReveal;
         if (wasReveal && mounted.current) armTimer();
+      } finally {
+        undoing.current = false;
       }
     });
   }, [go, reveal, armTimer]);
