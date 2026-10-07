@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { CATEGORIES } from "./jev";
+import { CATEGORIES, SUMMARY_CHARS } from "./jev";
 import { contractHash, hashOf, LAYA_QUESTIONS, layaContract, layaEvaluateBatch, layaHealth, parseLayaAnswers, stableStringify } from "./laya";
 
 const okAnswers = {
@@ -17,6 +17,9 @@ describe("contract", () => {
     expect(contractHash()).toMatch(/^[0-9a-f]{64}$/);
     expect(contractHash()).toBe(contractHash());
     expect(layaContract().version).toBe("1");
+  });
+  it("state descriptor follows the current SUMMARY_CHARS", () => {
+    expect(layaContract().state).toContain(`max ${SUMMARY_CHARS} chars`);
   });
   it("stableStringify ignores object key order but not array order", () => {
     expect(stableStringify({ a: 1, b: { c: 2, d: 3 } })).toBe(stableStringify({ b: { d: 3, c: 2 }, a: 1 }));
@@ -54,10 +57,10 @@ describe("client", () => {
   });
   it("rejects an empty checkpoint in health and batch", async () => {
     await expect(layaHealth({ url: "http://x", timeoutMs: 1000, fetchImpl: fakeFetch({ checkpoint: "", contract_hash: "h" }) })).rejects.toThrow();
-    await expect(layaEvaluateBatch([{ id: "a", title: "A", summary: null }], { url: "http://x", timeoutMs: 1000, fetchImpl: fakeFetch({ model: "", results: [{ answers: okAnswers }] }) })).rejects.toThrow();
+    await expect(layaEvaluateBatch([{ id: "a", title: "A", summary: null }], { url: "http://x", timeoutMs: 1000, fetchImpl: fakeFetch({ model: "", contract_hash: contractHash(), results: [{ answers: okAnswers }] }) })).rejects.toThrow();
   });
   it("batch takes the checkpoint from the response and isolates bad answers", async () => {
-    const f = fakeFetch({ model: "ck-resp", experimental: false, results: [{ answers: okAnswers }, { answers: { keep: { type: "noul", noul: 5 } } }] });
+    const f = fakeFetch({ model: "ck-resp", experimental: false, contract_hash: contractHash(), results: [{ answers: okAnswers }, { answers: { keep: { type: "noul", noul: 5 } } }] });
     const r = await layaEvaluateBatch(
       [{ id: "a", title: "A", summary: null }, { id: "b", title: "B", summary: "S" }],
       { url: "http://x", timeoutMs: 1000, fetchImpl: f },
@@ -69,6 +72,13 @@ describe("client", () => {
     const sent = JSON.parse((f.mock.calls[0][1] as RequestInit).body as string);
     expect(sent.states).toEqual([{ title: "A" }, { title: "B", summary: "S" }]);
     expect(Object.keys(sent.questions)).toEqual(["keep", "reason"]);
+  });
+  it("throws when the response contract hash is missing or differs", async () => {
+    const opts = (body: unknown) => ({ url: "http://x", timeoutMs: 1000, fetchImpl: fakeFetch(body) });
+    const results = [{ answers: okAnswers }];
+    const a = [{ id: "a", title: "A", summary: null }];
+    await expect(layaEvaluateBatch(a, opts({ model: "ck", results }))).rejects.toThrow("Laya contract mismatch in response");
+    await expect(layaEvaluateBatch(a, opts({ model: "ck", contract_hash: "stale", results }))).rejects.toThrow("Laya contract mismatch in response");
   });
   it("throws on HTTP errors (e.g. 503)", async () => {
     await expect(layaEvaluateBatch([{ id: "a", title: "A", summary: null }], { url: "http://x", timeoutMs: 1000, fetchImpl: fakeFetch({}, 503) })).rejects.toThrow(/503/);

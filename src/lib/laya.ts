@@ -7,7 +7,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { buildState, CATEGORIES } from "./jev";
+import { buildState, CATEGORIES, SUMMARY_CHARS } from "./jev";
 
 export const LAYA_CONTRACT_VERSION = "1";
 
@@ -35,7 +35,7 @@ export interface LayaContract {
 }
 
 export function layaContract(): LayaContract {
-  return { version: LAYA_CONTRACT_VERSION, state: "buildState({title, summary}) — summary trimmed, max 300 chars", questions: LAYA_QUESTIONS, criteriaOrder: Object.keys(LAYA_QUESTIONS.reason.criteria) };
+  return { version: LAYA_CONTRACT_VERSION, state: `buildState({title, summary}) — summary trimmed, max ${SUMMARY_CHARS} chars`, questions: LAYA_QUESTIONS, criteriaOrder: Object.keys(LAYA_QUESTIONS.reason.criteria) };
 }
 
 export function stableStringify(value: unknown): string {
@@ -115,9 +115,12 @@ export async function layaEvaluateBatch(
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
-  })) as { model?: unknown; experimental?: unknown; results?: Array<{ answers?: unknown }> };
+  })) as { model?: unknown; experimental?: unknown; contract_hash?: unknown; results?: Array<{ answers?: unknown }> };
   if (typeof r.model !== "string" || r.model.length === 0 || !Array.isArray(r.results) || r.results.length !== articles.length) {
     throw new Error("Laya batch response invalid");
+  }
+  if (typeof r.contract_hash !== "string" || r.contract_hash !== contractHash()) {
+    throw new Error("Laya contract mismatch in response");
   }
   const checkpoint = r.model;
   const experimental = Boolean(r.experimental);

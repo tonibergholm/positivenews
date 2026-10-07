@@ -28,6 +28,7 @@ async function main() {
     console.log("[laya-backfill] LAYA_URL is not set; nothing to do.");
     return;
   }
+  console.warn("[laya-backfill] WARNING: run this while the pipeline is idle (the scheduler only guards its own process; no cross-process check is possible).");
   console.log(`[laya-backfill] last ${days} days, limit ${limit}`);
   const result = await layaShadowEvaluate({
     since: new Date(Date.now() - days * 24 * 60 * 60 * 1000),
