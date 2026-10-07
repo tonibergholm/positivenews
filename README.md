@@ -197,6 +197,10 @@ pnpm labels:backfill                 # one-off: import historical judgements (id
 pnpm labels:export --out labels.jsonl  # train rows → labels.jsonl, test rows → labels.jsonl.test.jsonl
 ```
 
+Run `pnpm labels:backfill` (with no `--before`) right after the deploy and before the first review.
+
+The unbiased test set is the rows of `<out>.test.jsonl` with `tier = gold` and `bucket = cohort`. Other test rows are cohort articles with weaker labels.
+
 The scoreboard at `/news/admin/jev` ("Against your decisions") rates each source against your reviews.
 
 ### Initial seed

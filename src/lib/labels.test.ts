@@ -42,6 +42,14 @@ describe("isTestCohort", () => {
   });
 });
 
+describe("isTestCohort pinned ids", () => {
+  // Pins the hash split: changing the implementation would silently move the held-out cohort.
+  it("keeps known ids on the same side", () => {
+    expect(isTestCohort("article-13")).toBe(true);
+    expect(isTestCohort("article-0")).toBe(false);
+  });
+});
+
 describe("currentAdminAuthority", () => {
   it("returns the latest admin keep/reject", () => {
     const a1 = ev({ source: "admin", verdict: "keep" });

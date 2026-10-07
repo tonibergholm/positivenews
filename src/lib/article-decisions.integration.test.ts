@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeAll, afterAll } from "vitest";
 
-const hasDb = Boolean(process.env.DATABASE_URL);
+// Opt-in only: this suite writes and deletes rows. Never point DATABASE_URL at production.
+const hasDb = process.env.RUN_DB_TESTS === "1" && Boolean(process.env.DATABASE_URL);
 
 describe.skipIf(!hasDb)("article-decisions (integration)", () => {
   // Imported lazily so the suite never touches prisma without a database.
