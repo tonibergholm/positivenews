@@ -87,4 +87,65 @@ describe.skipIf(!hasDb)("article-decisions (integration)", () => {
     expect(e).toMatchObject({ source: "ollama", verdict: "keep", eligible: false });
     expect((await prisma.article.findUniqueOrThrow({ where: { id } })).curatedAt).not.toBeNull();
   });
+
+  // Holds the article row lock, queues two writers behind it in a known order, then releases.
+  async function queuedBehindLock(id: string, first: () => Promise<unknown>, second: () => Promise<unknown>) {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    let locked!: () => void;
+    const holding = new Promise<void>((r) => (locked = r));
+    const holder = prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "Article" WHERE id = ${id} FOR UPDATE`;
+        locked();
+        await gate;
+      },
+      { timeout: 20_000 },
+    );
+    await holding;
+    const a = first();
+    await new Promise((r) => setTimeout(r, 100));
+    const b = second();
+    await new Promise((r) => setTimeout(r, 100));
+    release();
+    await holder;
+    return Promise.all([a, b]);
+  }
+
+  it("Ollama queued behind the lock before an admin keep: the keep lands last and wins", async () => {
+    const id = await article();
+    const [ollama] = await queuedBehindLock(
+      id,
+      () => d.recordOllamaResult(id, { outcome: "judged_reject", reason: "war", pass: 1 }, "gemma3:4b"),
+      () => d.recordAdminDecision(id, "keep", { bucket: "manual", actor: "admin@test" }),
+    );
+    expect(ollama).toBe("applied");
+    const a = await prisma.article.findUniqueOrThrow({ where: { id } });
+    expect(a.isPositive).toBe(true);
+    expect(a.rejectionPass).toBeNull();
+  });
+
+  it("admin keep queued behind the lock before Ollama: authority is checked inside the lock", async () => {
+    const id = await article();
+    const [, ollama] = await queuedBehindLock(
+      id,
+      () => d.recordAdminDecision(id, "keep", { bucket: "manual", actor: "admin@test" }),
+      () => d.recordOllamaResult(id, { outcome: "judged_reject", reason: "war", pass: 1 }, "gemma3:4b"),
+    );
+    expect(ollama).toBe("recorded_only");
+    const a = await prisma.article.findUniqueOrThrow({ where: { id } });
+    expect(a.isPositive).toBe(true);
+    expect(a.rejectionPass).toBeNull();
+  });
+
+  it("requireUndecided: the second decision is refused, a redecide is allowed", async () => {
+    const id = await article();
+    const first = await d.recordAdminDecision(id, "keep", { bucket: "leak", actor: "a", requireUndecided: true });
+    expect(first.status).toBe("ok");
+    const second = await d.recordAdminDecision(id, "reject", { bucket: "leak", actor: "b", requireUndecided: true });
+    expect(second.status).toBe("already_decided");
+    expect((await prisma.article.findUniqueOrThrow({ where: { id } })).isPositive).toBe(true);
+    const third = await d.recordAdminDecision(id, "reject", { bucket: "leak", actor: "b" });
+    expect(third.status).toBe("ok");
+  });
 });

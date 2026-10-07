@@ -42,13 +42,14 @@ async function loadReveal(articleId: string): Promise<Reveal> {
   };
 }
 
-export async function decideAction(articleId: string, verdict: "keep" | "reject", category: string | null, bucket: string) {
+export async function decideAction(articleId: string, verdict: "keep" | "reject", category: string | null, bucket: string, redecide: boolean) {
   const who = await actor();
   if (verdict !== "keep" && verdict !== "reject") return { ok: false as const, error: "Invalid verdict" };
   if (!(REVIEW_BUCKETS as readonly string[]).includes(bucket)) return { ok: false as const, error: "Invalid bucket" };
   if (category && !Object.hasOwn(CATEGORIES, category)) return { ok: false as const, error: "Invalid category" };
   try {
-    const r = await recordAdminDecision(articleId, verdict, { category, bucket: bucket as ReviewBucket, actor: who });
+    const r = await recordAdminDecision(articleId, verdict, { category, bucket: bucket as ReviewBucket, actor: who, requireUndecided: !redecide });
+    if (r.status === "already_decided") return { ok: false as const, error: "Already decided elsewhere" };
     if (r.status === "not_found") return { ok: false as const, error: "Article not found" };
     // The decision is saved; a reveal failure must not turn it into an error.
     let reveal: Reveal;

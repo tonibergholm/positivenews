@@ -11,12 +11,13 @@ interface Props {
   categories: { key: string; label: string }[];
   skip: string[];
   more: boolean;
+  redecide: boolean;
 }
 
 const REVEAL_MS = 1500;
 const TRANSIENT = "Network error — try again";
 
-export function ReviewCardView({ card, categories, skip, more }: Props) {
+export function ReviewCardView({ card, categories, skip, more, redecide }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [picking, setPicking] = useState(false);
@@ -74,10 +75,10 @@ export function ReviewCardView({ card, categories, skip, more }: Props) {
       setError(null);
       startTransition(async () => {
         try {
-          const r = await decideAction(card.articleId, verdict, category, card.bucket);
+          const r = await decideAction(card.articleId, verdict, category, card.bucket, redecide);
           if (!r.ok) {
-            if (r.error === "Article not found") {
-              // The article is gone (e.g. cleaned up); move on to the next card.
+            if (r.error === "Article not found" || r.error === "Already decided elsewhere") {
+              // The article is gone (e.g. cleaned up) or another tab decided it; move on to the next card.
               busy.current = false;
               setTimeout(skipCard, 0); // outside the transition, like undo
               return;
@@ -96,7 +97,7 @@ export function ReviewCardView({ card, categories, skip, more }: Props) {
         }
       });
     },
-    [card, armTimer, skipCard],
+    [card, redecide, armTimer, skipCard],
   );
 
   const undo = useCallback(() => {

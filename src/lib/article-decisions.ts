@@ -112,14 +112,16 @@ function adminRejectReason(category: string | null): string {
 export async function recordAdminDecision(
   articleId: string,
   verdict: "keep" | "reject",
-  opts: { category?: string | null; bucket: ReviewBucket; actor: string | null },
-): Promise<{ status: "ok"; eventId: string } | { status: "not_found" }> {
+  opts: { category?: string | null; bucket: ReviewBucket; actor: string | null; requireUndecided?: boolean },
+): Promise<{ status: "ok"; eventId: string } | { status: "not_found" } | { status: "already_decided" }> {
   if (!(REVIEW_BUCKETS as readonly string[]).includes(opts.bucket)) throw new Error(`Invalid bucket: ${opts.bucket}`);
   const category = verdict === "reject" ? (opts.category ?? null) : null;
   if (category && !Object.hasOwn(CATEGORIES, category)) throw new Error(`Invalid category: ${category}`);
 
   return prisma.$transaction(async (tx) => {
     if (!(await lockArticle(tx, articleId))) return { status: "not_found" as const };
+    // First decision wins: a second tab deciding the same card must not overwrite the first.
+    if (opts.requireUndecided && (await loadAuthority(tx, articleId))) return { status: "already_decided" as const };
 
     const a = await tx.article.findUniqueOrThrow({
       where: { id: articleId },
