@@ -39,7 +39,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           <UndoLast more={more} />
         </div>
       ) : card ? (
-        <ReviewCardView key={`${card.articleId}:${one(params.t) ?? ""}`} card={card} categories={categories} skip={[...skip]} more={more} redecide={refocused} />
+        <ReviewCardView key={`${card.articleId}:${one(params.t) ?? ""}`} card={card} categories={categories} skip={[...skip]} more={more} redecide={false} />
       ) : (
         <div>
           <p className="text-sm text-muted-foreground">Nothing to review right now.</p>

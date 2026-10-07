@@ -43,11 +43,15 @@ export default async function FlaggedPage({
         return newestFlag !== null && authority.createdAt.getTime() < newestFlag;
       });
   const truncated = visible.length > DISPLAY_LIMIT;
-  const flagged = visible.slice(0, DISPLAY_LIMIT).map((r) => {
+  // Newest flag first, so re-opened flags (whose flaggedAt is old or null) aren't cut by the cap.
+  const withNewest = visible.map((r) => {
     const times = r.labelEvents.filter((e) => e.source === "reader_flag").map((e) => e.createdAt.getTime());
     if (r.flaggedAt) times.push(r.flaggedAt.getTime());
-    const newest = times.length ? new Date(Math.max(...times)) : null;
-    return { id: r.id, title: r.title, flaggedAt: newest, source: r.source };
+    return { r, newest: times.length ? Math.max(...times) : 0 };
+  });
+  withNewest.sort((a, b) => b.newest - a.newest);
+  const flagged = withNewest.slice(0, DISPLAY_LIMIT).map(({ r, newest }) => {
+    return { id: r.id, title: r.title, flaggedAt: newest ? new Date(newest) : null, source: r.source };
   });
 
   return (

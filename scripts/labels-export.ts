@@ -105,7 +105,8 @@ async function main() {
 
 main().catch(async (err) => {
   const message = err instanceof Error ? err.message : String(err);
-  console.error(message.startsWith("[labels-export]") ? message : `[labels-export] failed: ${message}`);
+  if (message.startsWith("[labels-export]")) console.error(message);
+  else console.error("[labels-export] failed:", err);
   await prisma.$disconnect();
   process.exit(1);
 });
