@@ -6,7 +6,7 @@ from __future__ import annotations
 import argparse, json
 from pathlib import Path
 from laya import Router
-from metrics import by_language, gate
+from metrics import by_language, gate, reason_metrics, reason_target
 
 BASE = "convaiinnovations/laya-multilingual"
 
@@ -23,6 +23,12 @@ def predict(router: Router, model: str, rows: list[dict]) -> dict[str, float]:
         out[r["id"]] = float(res["answers"]["keep"]["noul"])
     return out
 
+def reason_scores(router: Router, model: str, rows: list[dict]) -> dict:
+    sel = [(r, reason_target(r)) for r in rows if reason_target(r) is not None and "reason" in r["questions"]]
+    preds = [router.predict(r["state"], {"reason": r["questions"]["reason"]}, model=model)["answers"]["reason"]["choice"]
+             for r, _ in sel]
+    return reason_metrics(preds, [t for _, t in sel])
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", required=True)
@@ -35,6 +41,8 @@ def main():
     report = {"checkpoint": ck.name, "manifest": json.loads((data / "manifest.json").read_text())}
     for name, rows in (("val", val), ("test", test)):
         report[name] = {m: by_language(rows, predict(router, m, rows)) for m in ("positivenews", "base")}
+    report["reason"] = {name: {m: reason_scores(router, m, rows) for m in ("positivenews", "base")}
+                        for name, rows in (("val", val), ("test", test))}
     compare = {c["id"]: c for c in load(data / "test-compare.jsonl")} if (data / "test-compare.jsonl").exists() else {}
     report["test_compare"] = {
         src: {"coverage": sum(1 for r in test if compare.get(r["id"], {}).get(src) is not None),
@@ -48,7 +56,10 @@ def main():
     (ck / "report.md").write_text(
         f"# {ck.name}\n\ngate: **{report['gate']}**{' (test set < 50: indicative only)' if report['indicative_only'] else ''}\n\n"
         f"val: n={v['n']} bal_acc={v['balanced_accuracy']} ece={v['ece']} majority={v['majority_baseline']}\n\n"
-        f"test: n={t['n']} bal_acc={t['balanced_accuracy']} ece={t['ece']}\n")
+        f"test: n={t['n']} bal_acc={t['balanced_accuracy']} ece={t['ece']}\n\n"
+        + "reason top-1 (rows with gold.reason): "
+        + ", ".join(f"{s} n={report['reason'][s]['positivenews']['n']} acc={report['reason'][s]['positivenews']['accuracy']}"
+                    for s in ("val", "test")) + "\n")
     print(ck / "report.md")
 
 if __name__ == "__main__":

@@ -52,3 +52,12 @@ def by_language(rows: Iterable[dict], preds: dict[str, float]) -> dict:
         sel = [r for r in rows if lang == "all" or r["language"] == lang]
         out[lang] = keep_metrics([preds[r["id"]] for r in sel], [r["label"] for r in sel])
     return out
+
+def reason_target(row: dict) -> str | None:
+    """Top category of gold.reason, or None when the row has no reason target."""
+    probs = (row.get("gold") or {}).get("reason", {}).get("probabilities")
+    return max(probs, key=probs.get) if probs else None
+
+def reason_metrics(preds: list[str], targets: list[str]) -> dict:
+    n = len(preds)
+    return {"n": n, "accuracy": None if n == 0 else sum(p == t for p, t in zip(preds, targets)) / n}

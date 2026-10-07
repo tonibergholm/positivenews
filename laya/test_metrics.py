@@ -19,3 +19,10 @@ def test_gate():
     assert gate({"balanced_accuracy": 0.61, "majority_baseline": 0.5}, base, 500, 100) == "fail"
     assert gate(good, base, 100, 100) == "experimental"
     assert gate(good, base, 500, 10) == "experimental"
+
+def test_reason_metrics():
+    from metrics import reason_metrics, reason_target
+    assert reason_metrics([], []) == {"n": 0, "accuracy": None}
+    assert reason_metrics(["a", "b", "c"], ["a", "b", "x"])["accuracy"] == 2 / 3
+    assert reason_target({"gold": {"keep": {}, "reason": {"probabilities": {"cat_war": 0.2, "cat_crime": 0.8}}}}) == "cat_crime"
+    assert reason_target({"gold": {"keep": {}}}) is None

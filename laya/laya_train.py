@@ -7,6 +7,13 @@ to the stock `laya-train` CLI. Same flags. Drop it once upstream is fixed.
 """
 from __future__ import annotations
 import sys
+from importlib.metadata import version
+
+if version("laya") != "0.3.29":
+    raise SystemExit("laya_train.py: the mps device patch was written for laya 0.3.29 but %s is installed. "
+                     "Re-validate the patch (does finetune() still evaluate before moving the model?) "
+                     "and update this check." % version("laya"))
+
 import laya.train as _train
 
 _orig_load = _train.load_checkpoint

@@ -21,7 +21,7 @@ laya/train.sh              # full run, 2 epochs by default
 
 Flags: `--epochs`, `--micro-batch`, `--grad-accum`. Defaults can be overridden in `~/laya-positivenews/train.env`. `laya-train` holds out 10% of the train rows for calibration. It ignores the extra `id` and `language` keys.
 
-`laya_train.py` exists because laya 0.3.29 runs its pre-training eval before moving the model to the device. On mps this fails with "Passed CPU tensor to MPS op". Remove the wrapper once upstream fixes it.
+`laya_train.py` (which asserts laya == 0.3.29) exists because laya 0.3.29 runs its pre-training eval before moving the model to the device. On mps this fails with "Passed CPU tensor to MPS op". Remove the wrapper once upstream fixes it.
 
 ## Deploy (run on minos)
 

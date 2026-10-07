@@ -12,16 +12,21 @@ while [ $# -gt 0 ]; do case "$1" in
   --timing) TIMING=1;; --epochs) EPOCHS="$2"; shift;; --micro-batch) MB="$2"; shift;; --grad-accum) GA="$2"; shift;;
   *) echo "unknown arg $1"; exit 1;; esac; shift; done
 
-free_gb=$(df -g "$HOME" | awk 'NR==2{print $4}')
-[ "$free_gb" -ge 15 ] || { echo "Refusing: only ${free_gb} GB free (need 15)"; exit 1; }
-pmset -g batt | grep -q "AC Power" || { echo "Refusing: not on AC power"; exit 1; }
 mkdir -p "$HOME_DIR/data" "$HOME_DIR/checkpoints"
-ls -1dt "$HOME_DIR"/checkpoints/*/ 2>/dev/null | tail -n +3 | xargs -r rm -rf
+free_gb=$(df -Pk "$HOME_DIR" | awk 'NR==2{print int($4/1048576)}')
+[ "$free_gb" -ge 15 ] || { echo "Refusing: only ${free_gb} GB free on the filesystem of $HOME_DIR (need 15)" >&2; exit 1; }
+pmset -g batt | grep -q "AC Power" || { echo "Refusing: not on AC power" >&2; exit 1; }
+# Keep the two newest checkpoints. `|| true`: ls fails when the directory is empty (set -e + pipefail).
+{ ls -1dt "$HOME_DIR"/checkpoints/*/ 2>/dev/null | tail -n +3 | xargs -r rm -rf; } || true
 
-tmp=$(ssh -p "$SSH_PORT" "$SERVER" 'd=$(mktemp -d) && cd ~/apps/positivenews && pnpm -s laya:export --out "$d" >/dev/null && echo "$d"')
-id=$(ssh -p "$SSH_PORT" "$SERVER" "python3 -c 'import json;print(json.load(open(\"$tmp/manifest.json\"))[\"exportId\"])'")
-rsync -az -e "ssh -p $SSH_PORT" "$SERVER:$tmp/" "$HOME_DIR/data/$id/"
-ssh -p "$SSH_PORT" "$SERVER" "rm -rf '$tmp'"
+ssh_s() { ssh -o BatchMode=yes -o ConnectTimeout=15 -p "$SSH_PORT" "$SERVER" "$@"; }
+tmp=""
+trap '[ -z "$tmp" ] || ssh_s "rm -rf \"$tmp\" \"$tmp.tmp\"" || true' EXIT
+tmp=$(ssh_s 'd=$(mktemp -d) && cd ~/apps/positivenews && { pnpm -s laya:export --out "$d" >/dev/null || { rm -rf "$d"; exit 1; }; } && echo "$d"') \
+  || { tmp=""; echo "Refusing: could not run laya:export on $SERVER (port $SSH_PORT)" >&2; exit 1; }
+id=$(ssh_s "python3 -c 'import json;print(json.load(open(\"$tmp/manifest.json\"))[\"exportId\"])'") \
+  || { echo "Refusing: could not read manifest.json from the export" >&2; exit 1; }
+rsync -az -e "ssh -o BatchMode=yes -p $SSH_PORT" "$SERVER:$tmp/" "$HOME_DIR/data/$id/"
 data="$HOME_DIR/data/$id"
 train="$data/train.jsonl"
 if [ "$TIMING" = 1 ]; then head -n 200 "$train" > "$data/train-timing.jsonl"; train="$data/train-timing.jsonl"; EPOCHS=1; fi
