@@ -20,8 +20,11 @@ async function actor(): Promise<string | null> {
   return session.user?.email ?? null;
 }
 
+// Never revalidate /admin/review here: a server action that revalidates the current route
+// returns the new RSC payload in its response, which re-renders the page and remounts the
+// card, losing the reveal. The client navigates (replace + refresh) after the reveal instead.
 function revalidate() {
-  for (const p of ["/", "/admin/review", "/admin/rejections", "/admin/flagged"]) revalidatePath(p);
+  for (const p of ["/", "/admin/rejections", "/admin/flagged"]) revalidatePath(p);
 }
 
 async function loadReveal(articleId: string): Promise<Reveal> {
