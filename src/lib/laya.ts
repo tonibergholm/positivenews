@@ -31,22 +31,27 @@ export interface LayaContract {
   version: string;
   state: string;
   questions: typeof LAYA_QUESTIONS;
+  criteriaOrder: string[];
 }
 
 export function layaContract(): LayaContract {
-  return { version: LAYA_CONTRACT_VERSION, state: "buildState({title, summary}) — summary trimmed, max 300 chars", questions: LAYA_QUESTIONS };
+  return { version: LAYA_CONTRACT_VERSION, state: "buildState({title, summary}) — summary trimmed, max 300 chars", questions: LAYA_QUESTIONS, criteriaOrder: Object.keys(LAYA_QUESTIONS.reason.criteria) };
 }
 
-function stable(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`;
+export function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
   if (value && typeof value === "object") {
-    return `{${Object.keys(value as object).sort().map((k) => `${JSON.stringify(k)}:${stable((value as Record<string, unknown>)[k])}`).join(",")}}`;
+    return `{${Object.keys(value as object).sort().map((k) => `${JSON.stringify(k)}:${stableStringify((value as Record<string, unknown>)[k])}`).join(",")}}`;
   }
   return JSON.stringify(value);
 }
 
+export function hashOf(value: unknown): string {
+  return createHash("sha256").update(stableStringify(value)).digest("hex");
+}
+
 export function contractHash(): string {
-  return createHash("sha256").update(stable(layaContract())).digest("hex");
+  return hashOf(layaContract());
 }
 
 export interface LayaAnswer {
@@ -65,7 +70,7 @@ export function parseLayaAnswers(answers: unknown, checkpoint: string, experimen
     throw new Error("Laya answer \"keep\" is missing or invalid");
   }
   const reason = a.reason;
-  if (!reason || reason.type !== "choice" || typeof reason.choice !== "string" || !(reason.choice in CATEGORIES)) {
+  if (!reason || reason.type !== "choice" || typeof reason.choice !== "string" || !Object.hasOwn(CATEGORIES, reason.choice)) {
     throw new Error("Laya answer \"reason\" is missing or invalid");
   }
   const p = reason.probabilities?.[reason.choice];
@@ -94,7 +99,7 @@ async function call(path: string, opts: LayaClientOptions, init?: RequestInit): 
 
 export async function layaHealth(opts: LayaClientOptions): Promise<LayaHealth> {
   const h = (await call("/health", opts)) as Partial<LayaHealth>;
-  if (typeof h.checkpoint !== "string" || typeof h.contract_hash !== "string") throw new Error("Laya /health response invalid");
+  if (typeof h.checkpoint !== "string" || h.checkpoint.length === 0 || typeof h.contract_hash !== "string") throw new Error("Laya /health response invalid");
   return { checkpoint: h.checkpoint, contract_hash: h.contract_hash, experimental: Boolean(h.experimental) };
 }
 
@@ -111,7 +116,7 @@ export async function layaEvaluateBatch(
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   })) as { model?: unknown; experimental?: unknown; results?: Array<{ answers?: unknown }> };
-  if (typeof r.model !== "string" || !Array.isArray(r.results) || r.results.length !== articles.length) {
+  if (typeof r.model !== "string" || r.model.length === 0 || !Array.isArray(r.results) || r.results.length !== articles.length) {
     throw new Error("Laya batch response invalid");
   }
   const checkpoint = r.model;

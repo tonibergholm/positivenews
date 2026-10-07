@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { CATEGORIES } from "./jev";
-import { contractHash, LAYA_QUESTIONS, layaContract, layaEvaluateBatch, layaHealth, parseLayaAnswers } from "./laya";
+import { contractHash, hashOf, LAYA_QUESTIONS, layaContract, layaEvaluateBatch, layaHealth, parseLayaAnswers, stableStringify } from "./laya";
 
 const okAnswers = {
   keep: { type: "noul", noul: 0.8 },
@@ -18,6 +18,15 @@ describe("contract", () => {
     expect(contractHash()).toBe(contractHash());
     expect(layaContract().version).toBe("1");
   });
+  it("stableStringify ignores object key order but not array order", () => {
+    expect(stableStringify({ a: 1, b: { c: 2, d: 3 } })).toBe(stableStringify({ b: { d: 3, c: 2 }, a: 1 }));
+    expect(stableStringify([1, 2])).not.toBe(stableStringify([2, 1]));
+  });
+  it("hash changes when the contract changes, including criteria order", () => {
+    expect(hashOf({ q: { a: 1 } })).not.toBe(hashOf({ q: { a: 2 } }));
+    expect(hashOf({ order: ["x", "y"] })).not.toBe(hashOf({ order: ["y", "x"] }));
+    expect(layaContract().criteriaOrder).toEqual(Object.keys(CATEGORIES));
+  });
 });
 
 describe("parseLayaAnswers", () => {
@@ -27,6 +36,9 @@ describe("parseLayaAnswers", () => {
   it("rejects out-of-range keep, unknown reason, wrong types", () => {
     expect(() => parseLayaAnswers({ ...okAnswers, keep: { type: "noul", noul: 1.2 } }, "c", false)).toThrow(/keep/);
     expect(() => parseLayaAnswers({ ...okAnswers, reason: { type: "choice", choice: "cat_nope", probabilities: {} } }, "c", false)).toThrow(/reason/);
+    for (const choice of ["constructor", "__proto__", "toString"]) {
+      expect(() => parseLayaAnswers({ ...okAnswers, reason: { type: "choice", choice, probabilities: {} } }, "c", false)).toThrow(/reason/);
+    }
     expect(() => parseLayaAnswers({ keep: okAnswers.keep }, "c", false)).toThrow(/reason/);
   });
 });
@@ -39,6 +51,10 @@ describe("client", () => {
   it("health returns contract hash", async () => {
     const f = fakeFetch({ checkpoint: "ck", contract_hash: "h", experimental: true });
     expect(await layaHealth({ url: "http://x", timeoutMs: 1000, fetchImpl: f })).toEqual({ checkpoint: "ck", contract_hash: "h", experimental: true });
+  });
+  it("rejects an empty checkpoint in health and batch", async () => {
+    await expect(layaHealth({ url: "http://x", timeoutMs: 1000, fetchImpl: fakeFetch({ checkpoint: "", contract_hash: "h" }) })).rejects.toThrow();
+    await expect(layaEvaluateBatch([{ id: "a", title: "A", summary: null }], { url: "http://x", timeoutMs: 1000, fetchImpl: fakeFetch({ model: "", results: [{ answers: okAnswers }] }) })).rejects.toThrow();
   });
   it("batch takes the checkpoint from the response and isolates bad answers", async () => {
     const f = fakeFetch({ model: "ck-resp", experimental: false, results: [{ answers: okAnswers }, { answers: { keep: { type: "noul", noul: 5 } } }] });
