@@ -17,7 +17,7 @@ async function getFlaggedArticles() {
       flaggedAt: true,
       source: { select: { name: true, language: true } },
       labelEvents: {
-        where: { source: "admin" },
+        where: { source: { in: ["admin", "reader_flag"] } },
         select: { id: true, source: true, verdict: true, category: true, eligible: true, bucket: true, retractsId: true, createdAt: true },
       },
     },
@@ -35,8 +35,11 @@ export default async function FlaggedPage({
   const visible = showResolved
     ? rows
     : rows.filter((r) => {
-        const authority = currentAdminAuthority(r.labelEvents);
-        return !authority || (r.flaggedAt !== null && authority.createdAt < r.flaggedAt);
+        const authority = currentAdminAuthority(r.labelEvents.filter((e) => e.source === "admin"));
+        if (!authority) return true;
+        const flagTimes = r.labelEvents.filter((e) => e.source === "reader_flag").map((e) => e.createdAt.getTime());
+        const newestFlag = flagTimes.length ? Math.max(...flagTimes) : (r.flaggedAt?.getTime() ?? null);
+        return newestFlag !== null && authority.createdAt.getTime() < newestFlag;
       });
   const flagged = visible.map((r) => ({ id: r.id, title: r.title, flaggedAt: r.flaggedAt, source: r.source }));
 
@@ -47,11 +50,12 @@ export default async function FlaggedPage({
         <p className="text-sm text-muted-foreground">
           Articles users flagged as &quot;not positive news.&quot; These are LLM false positives — use them to spot patterns and update rejection rules.
         </p>
+        <p className="text-xs text-muted-foreground mt-1">Showing the latest 300 flagged articles.</p>
         <Link
           href={showResolved ? "/admin/flagged" : { pathname: "/admin/flagged", query: { resolved: "1" } }}
           className="inline-block mt-2 text-xs text-primary hover:underline"
         >
-          {showResolved ? "Show unresolved only" : "Show resolved"}
+          {showResolved ? "Show unresolved only" : "Show all"}
         </Link>
       </div>
 

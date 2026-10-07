@@ -116,7 +116,7 @@ export async function recordAdminDecision(
 ): Promise<{ status: "ok"; eventId: string } | { status: "not_found" }> {
   if (!(REVIEW_BUCKETS as readonly string[]).includes(opts.bucket)) throw new Error(`Invalid bucket: ${opts.bucket}`);
   const category = verdict === "reject" ? (opts.category ?? null) : null;
-  if (category && !(category in CATEGORIES)) throw new Error(`Invalid category: ${category}`);
+  if (category && !Object.hasOwn(CATEGORIES, category)) throw new Error(`Invalid category: ${category}`);
 
   return prisma.$transaction(async (tx) => {
     if (!(await lockArticle(tx, articleId))) return { status: "not_found" as const };

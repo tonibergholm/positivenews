@@ -46,7 +46,7 @@ export async function decideAction(articleId: string, verdict: "keep" | "reject"
   const who = await actor();
   if (verdict !== "keep" && verdict !== "reject") return { ok: false as const, error: "Invalid verdict" };
   if (!(REVIEW_BUCKETS as readonly string[]).includes(bucket)) return { ok: false as const, error: "Invalid bucket" };
-  if (category && !(category in CATEGORIES)) return { ok: false as const, error: "Invalid category" };
+  if (category && !Object.hasOwn(CATEGORIES, category)) return { ok: false as const, error: "Invalid category" };
   try {
     const r = await recordAdminDecision(articleId, verdict, { category, bucket: bucket as ReviewBucket, actor: who });
     if (r.status === "not_found") return { ok: false as const, error: "Article not found" };

@@ -26,14 +26,44 @@ function setLast(value: string | null) {
   window.dispatchEvent(new Event(LAST_EVENT));
 }
 
+const TRANSIENT = "Network error — try again";
+
+function readLast(): { eventId: string; articleId: string } | null {
+  const raw = sessionStorage.getItem(LAST_KEY);
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as { eventId?: unknown; articleId?: unknown };
+    if (typeof v?.eventId === "string" && typeof v?.articleId === "string") return { eventId: v.eventId, articleId: v.articleId };
+  } catch {
+    // bad JSON: treat as no last decision
+  }
+  return null;
+}
+
 export function ReviewCardView({ card, categories, skip, more }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [picking, setPicking] = useState(false);
   const [reveal, setReveal] = useState<Reveal | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const canUndo = useSyncExternalStore(subscribeLast, () => sessionStorage.getItem(LAST_KEY) !== null, () => false);
+  const canUndo = useSyncExternalStore(subscribeLast, () => readLast() !== null, () => false);
   const busy = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mounted = useRef(true);
+  const firstChip = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (picking) firstChip.current?.focus();
+  }, [picking]);
 
   const go = useCallback(
     (extra: { skip?: string[]; focus?: string }) => {
@@ -49,48 +79,83 @@ export function ReviewCardView({ card, categories, skip, more }: Props) {
     [router, skip, more],
   );
 
+  const armTimer = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      go({});
+    }, REVEAL_MS);
+  }, [go]);
+
   const decide = useCallback(
     (verdict: "keep" | "reject", category: string | null) => {
       if (busy.current) return;
       busy.current = true;
       setError(null);
       startTransition(async () => {
-        const r = await decideAction(card.articleId, verdict, category, card.bucket);
-        if (!r.ok) {
-          setError(r.error);
+        try {
+          const r = await decideAction(card.articleId, verdict, category, card.bucket);
+          if (!r.ok) {
+            setError(r.error);
+            busy.current = false;
+            return;
+          }
+          setLast(JSON.stringify({ eventId: r.eventId, articleId: card.articleId }));
+          if (!mounted.current) return;
+          setReveal(r.reveal);
+          armTimer();
+        } catch {
+          setError(TRANSIENT);
           busy.current = false;
-          return;
         }
-        setLast(JSON.stringify({ eventId: r.eventId, articleId: card.articleId }));
-        setReveal(r.reveal);
-        setTimeout(() => go({}), REVEAL_MS);
       });
     },
-    [card, go],
+    [card, armTimer],
   );
 
   const undo = useCallback(() => {
-    const raw = sessionStorage.getItem(LAST_KEY);
-    if (!raw || busy.current) return;
-    const last = JSON.parse(raw) as { eventId: string; articleId: string };
+    // Allowed while busy only during the reveal (decision already saved).
+    if (busy.current && !reveal) return;
+    const last = readLast();
+    if (!last) {
+      if (sessionStorage.getItem(LAST_KEY)) setLast(null);
+      return;
+    }
+    const wasReveal = busy.current;
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
     busy.current = true;
+    setError(null);
     startTransition(async () => {
-      const r = await undoAction(last.eventId);
-      setLast(null);
-      if (!r.ok) {
-        setError(r.error);
-        busy.current = false;
-        return;
+      try {
+        const r = await undoAction(last.eventId);
+        if (!r.ok) {
+          if (r.error === "Decision changed elsewhere" || r.error === "Decision not found") setLast(null);
+          setError(r.error);
+          busy.current = wasReveal;
+          if (wasReveal && mounted.current) armTimer();
+          return;
+        }
+        setLast(null);
+        go({ focus: last.articleId });
+      } catch {
+        setError(TRANSIENT);
+        busy.current = wasReveal;
+        if (wasReveal && mounted.current) armTimer();
       }
-      go({ focus: last.articleId });
     });
-  }, [go]);
+  }, [go, reveal, armTimer]);
 
   const skipCard = useCallback(() => go({ skip: [...skip, card.articleId] }), [go, skip, card.articleId]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey || reveal) return;
+      if (e.repeat) return;
+      if (e.target instanceof HTMLInputElement || e.metaKey || e.ctrlKey) return;
+      if (busy.current) {
+        if (reveal && e.key === "u") undo();
+        return;
+      }
       if (picking) {
         if (e.key === "n" || e.key === "0") decide("reject", null);
         const n = Number(e.key);
@@ -124,21 +189,29 @@ export function ReviewCardView({ card, categories, skip, more }: Props) {
         </a>
       </div>
 
-      {reveal ? (
-        <div className="border-t border-border bg-secondary/60 px-4 py-3 text-xs text-muted-foreground tabular-nums" role="status">
-          Ollama: {reveal.ollama ?? "—"} · Keyword: {reveal.keyword ? "reject" : "—"} · Jev:{" "}
-          {reveal.jev ? `${reveal.jev.keep ? "keep" : "reject"} (pos ${reveal.jev.positiveP.toFixed(2)}, upl ${reveal.jev.upliftingP.toFixed(2)}, ${reveal.jev.topCategory})` : "—"}
-        </div>
-      ) : picking ? (
+      <div
+        role="status"
+        aria-live="polite"
+        className={reveal ? "border-t border-border bg-secondary/60 px-4 py-3 text-xs text-muted-foreground tabular-nums" : "sr-only"}
+      >
+        {reveal && (
+          <>
+            Ollama: {reveal.ollama ?? "—"} · Keyword: {reveal.keyword ? "reject" : "—"} · Jev:{" "}
+            {reveal.jev ? `${reveal.jev.keep ? "keep" : "reject"} (pos ${reveal.jev.positiveP.toFixed(2)}, upl ${reveal.jev.upliftingP.toFixed(2)}, ${reveal.jev.topCategory})` : "—"}
+          </>
+        )}
+      </div>
+      {reveal ? null : picking ? (
         <div className="border-t border-border p-3">
           <div className="text-xs text-muted-foreground mb-2">Why reject? (optional)</div>
           <div className="flex flex-wrap gap-1.5">
             {categories.map((c, i) => (
               <button
                 key={c.key}
+                ref={i === 0 ? firstChip : undefined}
                 onClick={() => decide("reject", c.key)}
                 disabled={pending}
-                className="rounded-full bg-secondary px-2.5 py-1 text-xs text-foreground hover:bg-accent disabled:opacity-50"
+                className="rounded-full bg-secondary px-3 py-2 min-h-10 text-xs text-foreground hover:bg-accent disabled:opacity-50"
               >
                 {i < 9 ? <span className="text-muted-foreground mr-1">{i + 1}</span> : null}
                 {c.label}
@@ -147,7 +220,7 @@ export function ReviewCardView({ card, categories, skip, more }: Props) {
             <button
               onClick={() => decide("reject", null)}
               disabled={pending}
-              className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-secondary disabled:opacity-50"
+              className="rounded-full border border-border px-3 py-2 min-h-10 text-xs text-muted-foreground hover:bg-secondary disabled:opacity-50"
             >
               No category
             </button>
@@ -181,7 +254,7 @@ export function ReviewCardView({ card, categories, skip, more }: Props) {
 
       <div className="flex items-center justify-between px-4 pb-3 text-xs text-muted-foreground">
         <span className="hidden sm:inline">Keys: k keep · r reject (1–9, n) · s skip · u undo</span>
-        <button onClick={undo} disabled={!canUndo || pending} className="hover:text-foreground disabled:opacity-40">
+        <button onClick={undo} disabled={!canUndo || pending} className="min-h-10 px-3 hover:text-foreground disabled:opacity-40">
           Undo last
         </button>
       </div>
