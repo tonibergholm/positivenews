@@ -1,0 +1,8 @@
+[project]
+name = "positivenews-laya"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = ["laya[serve]>=0.3.28,<0.4", "pytest>=8"]
+
+[tool.uv]
+package = false
