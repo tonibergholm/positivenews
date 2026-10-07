@@ -1,5 +1,6 @@
 import cron from "node-cron";
 import { runPipeline } from "./pipeline";
+import { isLayaConfigured, layaShadowEvaluate } from "./laya-shadow";
 
 let started = false;
 
@@ -14,6 +15,20 @@ export function startScheduler(): void {
       await runPipeline();
     } catch (error) {
       console.error("[scheduler] Scheduled run failed:", error);
+    }
+  });
+
+  // Laya shadow evaluation: own schedule so it never extends the pipeline lock.
+  let layaRunning = false;
+  cron.schedule("7,22,37,52 * * * *", async () => {
+    if (!isLayaConfigured() || layaRunning) return;
+    layaRunning = true;
+    try {
+      await layaShadowEvaluate({ since: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), limit: 80, budgetMs: 120_000 });
+    } catch (error) {
+      console.error("[scheduler] Laya shadow failed:", error);
+    } finally {
+      layaRunning = false;
     }
   });
 

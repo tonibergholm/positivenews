@@ -11,6 +11,7 @@
     "test": "vitest run",
     "jev:smoke": "tsx scripts/jev-smoke.ts",
     "jev:backfill": "tsx scripts/jev-backfill.ts",
+    "laya:backfill": "tsx scripts/laya-backfill.ts",
     "laya:export": "tsx scripts/laya-export.ts",
     "labels:backfill": "tsx scripts/labels-backfill.ts",
     "labels:export": "tsx scripts/labels-export.ts",

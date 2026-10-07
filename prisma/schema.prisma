@@ -38,6 +38,7 @@ model Article {
   createdAt       DateTime  @default(now())
   jevEvaluations  JevEvaluation[]
   labelEvents     LabelEvent[]
+  layaEvaluations LayaEvaluation[]
 
   @@index([createdAt])
 }
@@ -104,4 +105,21 @@ model LabelEvent {
 
   @@index([articleId, createdAt])
   @@index([source, createdAt])
+}
+
+model LayaEvaluation {
+  id           String   @id @default(cuid())
+  article      Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  articleId    String
+  checkpoint   String
+  experimental Boolean  @default(false)
+  keepP        Float
+  reason       String
+  reasonP      Float
+  answers      Json
+  latencyMs    Int
+  createdAt    DateTime @default(now())
+
+  @@unique([articleId, checkpoint])
+  @@index([checkpoint, createdAt])
 }

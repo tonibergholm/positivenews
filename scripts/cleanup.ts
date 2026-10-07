@@ -2,7 +2,7 @@
  * Cleanup script — deletes articles older than 14 days that have no training value.
  *
  * Kept regardless of age:
- *   - articles with any LabelEvent or JevEvaluation (training data)
+ *   - articles with any LabelEvent, JevEvaluation or LayaEvaluation (training data)
  *   - articles from trusted sources (future positive training examples)
  * The feed itself only shows recent articles (FEED_MAX_AGE_DAYS in /api/articles),
  * so retention here is a safety net, not what keeps the feed fresh.
@@ -22,7 +22,7 @@ async function main() {
   const dryRun = process.argv.includes("--dry-run");
   const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
   console.log(
-    `[cleanup] ${new Date().toISOString()} ${dryRun ? "DRY RUN — " : ""}articles published before ${cutoff.toISOString()} without labels, Jev evaluations or a trusted source…`,
+    `[cleanup] ${new Date().toISOString()} ${dryRun ? "DRY RUN — " : ""}articles published before ${cutoff.toISOString()} without labels, Jev/Laya evaluations or a trusted source…`,
   );
 
   if (dryRun) {
@@ -31,6 +31,7 @@ async function main() {
         publishedAt: { lt: cutoff },
         labelEvents: { none: {} },
         jevEvaluations: { none: {} },
+        layaEvaluations: { none: {} },
         source: { url: { notIn: trustedUrls } },
       },
     });
@@ -52,12 +53,13 @@ async function main() {
             AND NOT (s.url = ANY(${trustedUrls}))
             AND NOT EXISTS (SELECT 1 FROM "LabelEvent" l WHERE l."articleId" = a.id)
             AND NOT EXISTS (SELECT 1 FROM "JevEvaluation" j WHERE j."articleId" = a.id)
+            AND NOT EXISTS (SELECT 1 FROM "LayaEvaluation" y WHERE y."articleId" = a.id)
           ORDER BY a.id
           LIMIT ${BATCH}
           FOR UPDATE OF a SKIP LOCKED`;
         if (candidates.length === 0) return { candidates: 0, deleted: 0 };
         const { count } = await tx.article.deleteMany({
-          where: { id: { in: candidates.map((c) => c.id) }, labelEvents: { none: {} }, jevEvaluations: { none: {} } },
+          where: { id: { in: candidates.map((c) => c.id) }, labelEvents: { none: {} }, jevEvaluations: { none: {} }, layaEvaluations: { none: {} } },
         });
         return { candidates: candidates.length, deleted: count };
       },
