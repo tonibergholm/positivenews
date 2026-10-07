@@ -94,8 +94,9 @@ async function main() {
 
   const sha = (s: string) => createHash("sha256").update(s).digest("hex");
   const count = (rows: LayaRow[], key: "source" | "label" | "language") => rows.reduce<Record<string, number>>((m, x) => ((m[x[key]] = (m[x[key]] ?? 0) + 1), m), {});
-  const stamp = cutoff.toISOString().replace(/[-:]/g, "").slice(0, 13);
-  const exportId = `${stamp}-${sha(files["train-ids.txt"]).slice(0, 6)}`;
+  const fileHashes = Object.fromEntries(Object.entries(files).map(([n, c]) => [n, sha(c)]));
+  const stamp = cutoff.toISOString().replace(/[-:]/g, "").slice(0, 15); // YYYYMMDDTHHMMSS
+  const exportId = `${stamp}-${sha(Object.values(fileHashes).join("")).slice(0, 6)}`;
   const manifest = {
     exportId,
     cutoff: cutoff.toISOString(),
@@ -105,7 +106,7 @@ async function main() {
     weights: LAYA_WEIGHTS,
     balance: r.balance,
     counts: Object.fromEntries((["train", "val", "test"] as const).map((k) => [k, { total: r[k].length, bySource: count(r[k], "source"), byLabel: count(r[k], "label"), byLanguage: count(r[k], "language") }])),
-    files: Object.fromEntries(Object.entries(files).map(([n, c]) => [n, sha(c)])),
+    files: fileHashes,
   };
   writeFileSync(join(tmp, "manifest.json"), JSON.stringify(manifest, null, 2));
   if (existsSync(out)) rmSync(out, { recursive: true, force: true });

@@ -1,11 +1,14 @@
 /**
- * Cleanup script — deletes articles older than 14 days that have no training value.
+ * Cleanup script: deletes articles published more than 14 days ago that carry no training signal.
+ * Deleting an article cascades to its dependent rows.
  *
  * Kept regardless of age:
- *   - articles with any LabelEvent, JevEvaluation or LayaEvaluation (training data)
- *   - articles from trusted sources (future positive training examples)
- * The feed itself only shows recent articles (FEED_MAX_AGE_DAYS in /api/articles),
- * so retention here is a safety net, not what keeps the feed fresh.
+ *   - articles with any LabelEvent, JevEvaluation or LayaEvaluation (labels and shadow
+ *     evaluations feed training and the scoreboard)
+ *   - articles from trusted sources (positive training examples)
+ * Deletion runs in batches that lock their candidate rows (FOR UPDATE SKIP LOCKED), so an article
+ * being labelled concurrently is not deleted. The feed only shows recent articles
+ * (FEED_MAX_AGE_DAYS in /api/articles), so retention is a safety net, not what keeps the feed fresh.
  *
  * Usage: npx tsx scripts/cleanup.ts [--dry-run]
  * Cron:  0 3 * * * cd /path/to/positivenews && npx tsx scripts/cleanup.ts >> $HOME/logs/positivenews-cleanup.log 2>&1

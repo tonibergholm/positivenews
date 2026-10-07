@@ -122,4 +122,5 @@ model LayaEvaluation {
 
   @@unique([articleId, checkpoint])
   @@index([checkpoint, createdAt])
+  @@index([createdAt])
 }

@@ -1,7 +1,7 @@
 /**
  * Pure mapping from article signals to Laya training rows.
  * One supervision result per article (fixed precedence), then question targets;
- * cohort articles go only to test (gold only); validation is a seeded stratified 10%.
+ * cohort articles go only to test (gold only); validation is a a deterministic seeded-hash 10% sample (per article, no stratified quotas).
  */
 
 import { createHash } from "node:crypto";
