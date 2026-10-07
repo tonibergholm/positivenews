@@ -26,6 +26,22 @@ function beforeArg(): Date {
 type Kind = "keyword" | "ollama" | "flag";
 type RowData = Omit<Prisma.LabelEventCreateManyInput, "articleId" | "backfilled" | "dedupeKey">;
 
+interface Prev {
+  rejectionPass: number | null;
+  rejectionReason: string | null;
+  curatedAt: Date | null;
+}
+
+/** Reads an admin event's prevState JSON ({ isPositive, curatedAt, rejectionPass, rejectionReason }). */
+function parsePrev(v: unknown): Prev | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  const pass = typeof o.rejectionPass === "number" ? o.rejectionPass : null;
+  const reason = typeof o.rejectionReason === "string" ? o.rejectionReason : null;
+  const cur = typeof o.curatedAt === "string" ? new Date(o.curatedAt) : null;
+  return { rejectionPass: pass, rejectionReason: reason, curatedAt: cur && !Number.isNaN(cur.getTime()) ? cur : null };
+}
+
 async function main() {
   const before = beforeArg();
   const counts = { scanned: 0, keyword: 0, ollama_reject: 0, ollama_keep_unverified: 0, flag: 0, excludedLive: 0, skipped: 0 };
@@ -47,7 +63,12 @@ async function main() {
         rejectionPass: true,
         rejectionReason: true,
         source: { select: { url: true } },
-        labelEvents: { where: { backfilled: false }, select: { source: true } },
+        labelEvents: {
+          // Live events only; admin keep/reject rows carry prevState (the state before the decision).
+          where: { backfilled: false },
+          orderBy: { createdAt: "asc" },
+          select: { source: true, verdict: true, prevState: true },
+        },
       },
     });
     if (batch.length === 0) break;
@@ -56,18 +77,25 @@ async function main() {
     for (const a of batch) {
       counts.scanned++;
       const live = new Set(a.labelEvents.map((e) => e.source));
+      // An admin decision overwrote the article's fields; map the state it replaced instead.
+      const adminPrev = parsePrev(
+        a.labelEvents.find((e) => e.source === "admin" && (e.verdict === "keep" || e.verdict === "reject"))?.prevState,
+      );
+      const hist = adminPrev
+        ? { rejectionPass: adminPrev.rejectionPass, rejectionReason: adminPrev.rejectionReason, curatedAt: adminPrev.curatedAt }
+        : { rejectionPass: a.rejectionPass, rejectionReason: a.rejectionReason, curatedAt: a.curatedAt };
       const rows: Array<{ kind: Kind; data: RowData }> = [];
 
-      if (a.rejectionPass === 0) {
+      if (hist.rejectionPass === 0) {
         if (live.has("keyword")) counts.excludedLive++;
-        else rows.push({ kind: "keyword", data: { source: "keyword", verdict: "reject", reason: a.rejectionReason, createdAt: a.createdAt } });
-      } else if (a.rejectionPass === 1 || a.rejectionPass === 2) {
+        else rows.push({ kind: "keyword", data: { source: "keyword", verdict: "reject", reason: hist.rejectionReason, createdAt: a.createdAt } });
+      } else if (hist.rejectionPass === 1 || hist.rejectionPass === 2) {
         if (live.has("ollama")) counts.excludedLive++;
-        else rows.push({ kind: "ollama", data: { source: "ollama", verdict: "reject", reason: a.rejectionReason, pass: a.rejectionPass, createdAt: a.curatedAt ?? a.createdAt } });
-      } else if (a.curatedAt && a.rejectionPass === null && !trusted.has(a.source.url)) {
+        else rows.push({ kind: "ollama", data: { source: "ollama", verdict: "reject", reason: hist.rejectionReason, pass: hist.rejectionPass, createdAt: hist.curatedAt ?? a.createdAt } });
+      } else if (hist.curatedAt && hist.rejectionPass === null && !trusted.has(a.source.url)) {
         // An admin keep also sets curatedAt with no rejection; it must not become a made-up Ollama event.
-        if (live.has("ollama") || live.has("admin")) counts.excludedLive++;
-        else rows.push({ kind: "ollama", data: { source: "ollama", verdict: "keep", reason: "historical approval (unverified)", pass: 2, eligible: false, createdAt: a.curatedAt } });
+        if (live.has("ollama") || (!adminPrev && live.has("admin"))) counts.excludedLive++;
+        else rows.push({ kind: "ollama", data: { source: "ollama", verdict: "keep", reason: "historical approval (unverified)", pass: 2, eligible: false, createdAt: hist.curatedAt } });
       }
       if (a.flaggedAt) {
         if (live.has("reader_flag")) counts.excludedLive++;

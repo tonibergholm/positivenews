@@ -54,7 +54,7 @@ export async function curateUnchecked(): Promise<{
 
   if (trusted.length > 0) {
     await prisma.article.updateMany({
-      where: { id: { in: trusted.map((a) => a.id) } },
+      where: { id: { in: trusted.map((a) => a.id) }, isPositive: true, curatedAt: null },
       data: { curatedAt: new Date() },
     });
     console.log(`[curate] Auto-approved ${trusted.length} trusted-source articles`);
