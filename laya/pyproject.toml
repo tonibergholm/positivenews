@@ -1,0 +1,17 @@
+[project]
+name = "positivenews-laya"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = ["laya[serve]>=0.3.29,<0.3.30", "torch>=2.14", "pytest>=8"]
+
+[tool.uv]
+package = false
+
+# CPU-only torch on Linux (the server has no GPU); macOS uses the default PyPI wheel.
+[tool.uv.sources]
+torch = { index = "pytorch-cpu", marker = "sys_platform == 'linux'" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

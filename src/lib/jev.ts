@@ -13,7 +13,7 @@ export const JEV_DEFAULT_MODEL = "jev-1.13.0";
 /** Bump whenever a question, criterion, or the state format changes. */
 export const QUESTION_SET = "v1";
 
-const SUMMARY_CHARS = 300;
+export const SUMMARY_CHARS = 300;
 
 export interface JevArticle {
   title: string;

@@ -68,7 +68,17 @@ function Triple({ cells }: { cells: string[] }) {
   );
 }
 
-function ScoreTableView({ title, table }: { title: string; table: ScoreTable }) {
+function ScoreTableView({
+  title,
+  table,
+  showLaya = false,
+  laya = null,
+}: {
+  title: string;
+  table: ScoreTable;
+  showLaya?: boolean;
+  laya?: { checkpoint: string; experimental: boolean } | null;
+}) {
   const rows: { name: string; n: string[]; agreement: string[]; precision: string[]; hidden: string[] }[] = [
     {
       name: "Jev",
@@ -84,6 +94,17 @@ function ScoreTableView({ title, table }: { title: string; table: ScoreTable }) 
       precision: SLICE_KEYS.map((s) => pct(table.ollama[s].rejectPrecision)),
       hidden: SLICE_KEYS.map((s) => String(table.ollama[s].wronglyHidden)),
     },
+    ...(showLaya && laya
+      ? [
+          {
+            name: "Laya",
+            n: SLICE_KEYS.map((s) => String(table.laya[s].n)),
+            agreement: SLICE_KEYS.map((s) => pct(table.laya[s].agreement)),
+            precision: SLICE_KEYS.map((s) => pct(table.laya[s].rejectPrecision)),
+            hidden: SLICE_KEYS.map((s) => String(table.laya[s].wronglyHidden)),
+          },
+        ]
+      : []),
     {
       name: "Keyword filter",
       n: SLICE_KEYS.map((s) => String(table.keyword[s].n)),
@@ -126,6 +147,13 @@ function ScoreTableView({ title, table }: { title: string; table: ScoreTable }) 
           </tbody>
         </table>
       </div>
+      {showLaya && (
+        <p className="text-xs text-muted-foreground tabular-nums mt-2">
+          {laya
+            ? `Laya checkpoint ${laya.checkpoint}${laya.experimental ? " (experimental)" : ""} — evaluated ${table.laya.all.n} of ${table.labels.all} cohort labels`
+            : "Laya: not running yet"}
+        </p>
+      )}
     </div>
   );
 }
@@ -228,12 +256,14 @@ function DisagreementTable({ rows }: { rows: Disagreement[] }) {
 export function JevReportView({
   report,
   scores,
+  laya,
   filters,
   questionSet,
   thresholds,
 }: {
   report: JevReport;
   scores: { cohort: ScoreTable; targeted: ScoreTable };
+  laya: { checkpoint: string; experimental: boolean } | null;
   filters: JevFilters;
   questionSet: string;
   thresholds: JevThresholds;
@@ -271,7 +301,7 @@ export function JevReportView({
               accumulate (about 4 cohort reviews a day).
             </p>
             <div className="space-y-4">
-              <ScoreTableView title="Random cohort (unbiased)" table={scores.cohort} />
+              <ScoreTableView title="Random cohort (unbiased)" table={scores.cohort} showLaya laya={laya} />
               <ScoreTableView title="Targeted reviews" table={scores.targeted} />
             </div>
           </>

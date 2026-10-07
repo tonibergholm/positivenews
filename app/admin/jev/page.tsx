@@ -28,7 +28,8 @@ export default async function JevPage({ searchParams }: { searchParams: Promise<
 
   const rows = await loadReportRows();
   const report = buildReport(rows, DEFAULT_THRESHOLDS);
-  const scores = scoreSources(await loadScoreRows());
+  const { rows: scoreRows, laya } = await loadScoreRows();
+  const scores = scoreSources(scoreRows);
 
   return (
     <div className="max-w-6xl">
@@ -48,6 +49,7 @@ export default async function JevPage({ searchParams }: { searchParams: Promise<
         <JevReportView
           report={report}
           scores={scores}
+          laya={laya}
           filters={filters}
           questionSet={QUESTION_SET}
           thresholds={DEFAULT_THRESHOLDS}

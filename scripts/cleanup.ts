@@ -1,11 +1,14 @@
 /**
- * Cleanup script — deletes articles older than 14 days that have no training value.
+ * Cleanup script: deletes articles published more than 14 days ago that carry no training signal.
+ * Deleting an article cascades to its dependent rows.
  *
  * Kept regardless of age:
- *   - articles with any LabelEvent or JevEvaluation (training data)
- *   - articles from trusted sources (future positive training examples)
- * The feed itself only shows recent articles (FEED_MAX_AGE_DAYS in /api/articles),
- * so retention here is a safety net, not what keeps the feed fresh.
+ *   - articles with any LabelEvent, JevEvaluation or LayaEvaluation (labels and shadow
+ *     evaluations feed training and the scoreboard)
+ *   - articles from trusted sources (positive training examples)
+ * Deletion runs in batches that lock their candidate rows (FOR UPDATE SKIP LOCKED), so an article
+ * being labelled concurrently is not deleted. The feed only shows recent articles
+ * (FEED_MAX_AGE_DAYS in /api/articles), so retention is a safety net, not what keeps the feed fresh.
  *
  * Usage: npx tsx scripts/cleanup.ts [--dry-run]
  * Cron:  0 3 * * * cd /path/to/positivenews && npx tsx scripts/cleanup.ts >> $HOME/logs/positivenews-cleanup.log 2>&1
@@ -22,7 +25,7 @@ async function main() {
   const dryRun = process.argv.includes("--dry-run");
   const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
   console.log(
-    `[cleanup] ${new Date().toISOString()} ${dryRun ? "DRY RUN — " : ""}articles published before ${cutoff.toISOString()} without labels, Jev evaluations or a trusted source…`,
+    `[cleanup] ${new Date().toISOString()} ${dryRun ? "DRY RUN — " : ""}articles published before ${cutoff.toISOString()} without labels, Jev/Laya evaluations or a trusted source…`,
   );
 
   if (dryRun) {
@@ -31,6 +34,7 @@ async function main() {
         publishedAt: { lt: cutoff },
         labelEvents: { none: {} },
         jevEvaluations: { none: {} },
+        layaEvaluations: { none: {} },
         source: { url: { notIn: trustedUrls } },
       },
     });
@@ -52,12 +56,13 @@ async function main() {
             AND NOT (s.url = ANY(${trustedUrls}))
             AND NOT EXISTS (SELECT 1 FROM "LabelEvent" l WHERE l."articleId" = a.id)
             AND NOT EXISTS (SELECT 1 FROM "JevEvaluation" j WHERE j."articleId" = a.id)
+            AND NOT EXISTS (SELECT 1 FROM "LayaEvaluation" y WHERE y."articleId" = a.id)
           ORDER BY a.id
           LIMIT ${BATCH}
           FOR UPDATE OF a SKIP LOCKED`;
         if (candidates.length === 0) return { candidates: 0, deleted: 0 };
         const { count } = await tx.article.deleteMany({
-          where: { id: { in: candidates.map((c) => c.id) }, labelEvents: { none: {} }, jevEvaluations: { none: {} } },
+          where: { id: { in: candidates.map((c) => c.id) }, labelEvents: { none: {} }, jevEvaluations: { none: {} }, layaEvaluations: { none: {} } },
         });
         return { candidates: candidates.length, deleted: count };
       },
