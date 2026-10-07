@@ -8,7 +8,7 @@ import { hasRawLast, readLast, setLast, subscribeLast } from "./last-decision";
 const TRANSIENT = "Network error — try again";
 
 // Undo for the states with no card on screen ("Done for today", "Nothing to review").
-export function UndoLast() {
+export function UndoLast({ more = false }: { more?: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +37,7 @@ export function UndoLast() {
         setLast(null);
         // Navigate outside the transition (see ReviewCard): inside it the refresh never commits.
         setTimeout(() => {
-          router.replace(`/admin/review?focus=${encodeURIComponent(last.articleId)}&t=${Date.now()}`);
+          router.replace(`/admin/review?${more ? "more=1&" : ""}focus=${encodeURIComponent(last.articleId)}&t=${Date.now()}`);
           router.refresh();
         }, 0);
       } catch {

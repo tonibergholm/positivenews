@@ -15,8 +15,11 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const params = await searchParams;
   const skip = new Set((one(params.skip) ?? "").split(",").filter(Boolean).slice(0, 200));
   const more = one(params.more) === "1";
-  const { card, doneToday } = await loadNextCard({ exclude: skip, focus: one(params.focus) ?? null });
-  const done = doneToday >= DAILY_TARGET && !more;
+  const focus = one(params.focus) ?? null;
+  const { card, doneToday } = await loadNextCard({ exclude: skip, focus });
+  // A card re-shown by undo is always displayed, even past the daily target.
+  const refocused = focus !== null && card?.articleId === focus;
+  const done = doneToday >= DAILY_TARGET && !more && !refocused;
   const categories = Object.entries(CATEGORIES).map(([key, c]) => ({ key, label: c.label }));
 
   return (
@@ -33,14 +36,14 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           <Link href={{ pathname: "/admin/review", query: { more: "1" } }} className="inline-block mt-4 text-sm text-primary hover:underline">
             Keep going
           </Link>
-          <UndoLast />
+          <UndoLast more={more} />
         </div>
       ) : card ? (
-        <ReviewCardView key={`${card.articleId}:${one(params.t) ?? ""}`} card={card} categories={categories} skip={[...skip]} more={more} />
+        <ReviewCardView key={`${card.articleId}:${one(params.t) ?? ""}`} card={card} categories={categories} skip={[...skip]} more={more} redecide={false} />
       ) : (
         <div>
           <p className="text-sm text-muted-foreground">Nothing to review right now.</p>
-          <UndoLast />
+          <UndoLast more={more} />
         </div>
       )}
 
