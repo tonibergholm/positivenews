@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { isTestCohort, type LabelEventLike } from "./labels";
 import { buildSplits, LAYA_WEIGHTS, seededShuffle, supervise, textKey, toRow, type ArticleSignals } from "./laya-export";
 
@@ -18,6 +18,15 @@ const freshId = (): string => {
 const art = (p: Partial<ArticleSignals>): ArticleSignals => {
   const id = p.id ?? freshId();
   return { id, title: `T ${id}`, summary: "S", language: "fi", trusted: false, events: [], jev: null, ...p };
+};
+beforeEach(() => {
+  idCursor = 0;
+});
+/** n explicit non-cohort ids, namespaced by tag so tests never depend on a shared cursor. */
+const ids = (tag: string, n: number, cohort = false): string[] => {
+  const out: string[] = [];
+  for (let j = 0; out.length < n; j++) if (isTestCohort(`${tag}-${j}`) === cohort) out.push(`${tag}-${j}`);
+  return out;
 };
 const histEv = () => ev({ source: "ollama", verdict: "keep", eligible: false, reason: "historical approval (unverified)" });
 const kwEv = () => ev({ source: "keyword", verdict: "reject" });
@@ -221,6 +230,88 @@ describe("text de-duplication", () => {
   });
   it("textKey normalizes case, NFKC and whitespace and treats null summary as empty", () => {
     expect(textKey({ title: "Ａ  b", summary: null })).toBe(textKey({ title: "a b", summary: "" }));
+  });
+});
+
+describe("balance rules (each fails if the rule is removed)", () => {
+  it("trusted rows never exceed non-trusted keeps even when the draw is smaller than the pool", () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const fx = [
+        ...ids(`tc-t${seed}`, 10).map((id) => art({ id, trusted: true })),
+        ...ids(`tc-h${seed}`, 10).map((id) => art({ id, events: [histEv()] })),
+        ...ids(`tc-k${seed}`, 4).map((id) => art({ id, events: [kwEv()] })),
+      ];
+      const r = buildSplits(fx, seed);
+      const rows = [...r.train, ...r.val];
+      const trusted = rows.filter((x) => x.source === "trusted").length;
+      expect(r.balance.byLanguage.fi.keepRows).toBe(4);
+      expect(trusted).toBeLessThanOrEqual(rows.filter((x) => x.label === "keep").length - trusted);
+    }
+  });
+  it("historical rows are capped at 5000 per language", () => {
+    const fx = [...ids("hc-h", 5100).map((id) => art({ id, events: [histEv()] })), ...ids("hc-k", 5100).map((id) => art({ id, events: [kwEv()] }))];
+    const r = buildSplits(fx, 7);
+    expect(r.balance.byLanguage.fi.bySource.historical.preCap).toBe(5100);
+    expect(r.balance.byLanguage.fi.bySource.historical.kept).toBeLessThanOrEqual(5000);
+    expect(r.balance.byLanguage.fi.bySource.historical.kept).toBe(5000);
+  });
+  it("validation side depends on the text only, not on the winning id, label or source", () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const weak = ids(`vk-w${seed}`, 6).map((id, i) => art({ id, title: `text ${seed}-${i}`, events: [rejEv()] }));
+      const side = (xs: ArticleSignals[]) => {
+        const r = buildSplits(xs, seed);
+        return new Map([...r.val.map((x) => [x.textKey, "val"] as const), ...r.train.map((x) => [x.textKey, "train"] as const)]);
+      };
+      const before = side(weak);
+      const strong = ids(`vk-s${seed}`, 6).map((id, i) => art({ id, title: `TEXT ${seed}-${i}`, events: [ev({ source: "admin", verdict: "keep" })] }));
+      const after = side([...weak, ...strong]);
+      for (const w of weak) expect(after.get(textKey(w))).toBe(before.get(textKey(w)));
+    }
+  });
+});
+
+describe("text key follows the model input", () => {
+  it("articles sharing title and the first 300 summary chars are duplicates", () => {
+    const base = "x".repeat(300);
+    const [a, b] = ids("tk", 2);
+    const r = buildSplits([art({ id: a, title: "Same", summary: base + " ending one", events: [rejEv()] }), art({ id: b, title: "Same", summary: base + " other ending", events: [kwEv()] })], 7);
+    expect([...r.train, ...r.val]).toHaveLength(1);
+    expect(r.balance.duplicatesDropped).toBe(1);
+    expect(textKey({ title: "Same", summary: base + "1" })).toBe(textKey({ title: "Same", summary: base + "2" }));
+    expect(textKey({ title: "Same", summary: "y" + base })).not.toBe(textKey({ title: "Same", summary: base }));
+  });
+});
+
+describe("cohort groups", () => {
+  const gold = (v: "keep" | "reject") => [ev({ source: "admin", verdict: v })];
+  it("prefers a gold row from a cohort article over a lower-id non-cohort gold row", () => {
+    const [low] = ids("cg-a", 1);
+    const [high] = ids("cg-z", 1, true);
+    const r = buildSplits([art({ id: low, title: "G", events: gold("keep") }), art({ id: high, title: "g", events: gold("reject") })], 7);
+    expect(r.test.map((x) => x.id)).toEqual([high]);
+    expect([...r.train, ...r.val]).toEqual([]);
+  });
+  it("falls back to the lowest-id gold row when no cohort article has gold", () => {
+    const [c] = ids("cg-c", 1, true);
+    const [g1, g2] = ids("cg-g", 2);
+    const r = buildSplits([art({ id: c, title: "F", events: [kwEv()] }), art({ id: g2, title: "f", events: gold("keep") }), art({ id: g1, title: "F ", events: gold("reject") })], 7);
+    expect(r.test.map((x) => x.id)).toEqual([[g1, g2].sort()[0]]);
+  });
+  it("counts rows dropped by a cohort group that yields no test row", () => {
+    const [c] = ids("cg-d", 1, true);
+    const [o] = ids("cg-e", 1);
+    const r = buildSplits([art({ id: c, title: "D", events: [kwEv()] }), art({ id: o, title: "d", events: [rejEv()] })], 7);
+    expect(r.test).toEqual([]);
+    expect(r.balance.cohortGroupDropped).toBe(2);
+    expect(r.balance.duplicatesDropped).toBe(0);
+  });
+});
+
+describe("rows lost in balancing", () => {
+  it("a language with 100+ rows before balancing that keeps none is infeasible and fails overall", () => {
+    const r = buildSplits(ids("rl", 120).map((id) => art({ id, events: [kwEv()] })), 7);
+    expect(r.balance.byLanguage.fi).toMatchObject({ preRows: 120, keepRows: 0, rejectRows: 0, status: "infeasible" });
+    expect(r.balance.status).toBe("infeasible");
   });
 });
 

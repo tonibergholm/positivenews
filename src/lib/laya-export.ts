@@ -82,7 +82,11 @@ export interface LayaRow {
 }
 
 const normalize = (t: string) => t.normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
-export const textKey = (r: { title: string; summary: string | null }) => createHash("sha256").update(normalize(`${r.title}\n${r.summary ?? ""}`)).digest("hex");
+/** Keyed on what the model sees: title plus the summary trimmed to SUMMARY_CHARS (via buildState). */
+export const textKey = (r: { title: string; summary: string | null }) => {
+  const st = buildState(r);
+  return createHash("sha256").update(normalize(`${st.title}\n${st.summary ?? ""}`)).digest("hex");
+};
 
 const round = (x: number) => Math.round(x * 1e6) / 1e6;
 
@@ -122,6 +126,8 @@ interface Status {
   rejectRows: number;
 }
 export interface LanguageBalance extends Status {
+  /** Rows after de-duplication, before balancing. */
+  preRows: number;
   bySource: SourceCounts;
 }
 
@@ -131,7 +137,10 @@ export interface SplitResult {
   test: LayaRow[];
   balance: Status & {
     meanTarget: number;
+    /** Rows collapsed into another row of the same text group (in groups that yielded a row). */
     duplicatesDropped: number;
+    /** Rows dropped because their text group touched the test cohort without contributing a test row. */
+    cohortGroupDropped: number;
     bySource: SourceCounts;
     byLanguage: Record<LangBucket, LanguageBalance>;
   };
@@ -180,12 +189,15 @@ function balanceLanguage(g: Record<SupervisionSource, LayaRow[]>, seed: number, 
   const rejects = [...pr, ...rejectPool.slice(0, Math.max(0, target - pr.length))];
   const rows = [...keeps, ...rejects];
   const share = keepShare(keeps.length, rejects.length);
-  const ok = rows.length === 0 || (share >= 0.4 && share <= 0.6);
+  const preRows = SOURCE_ORDER.reduce((n, src) => n + g[src].length, 0);
+  const ok = rows.length === 0 ? preRows === 0 : share >= 0.4 && share <= 0.6;
+  const reason = ok ? null : rows.length === 0 ? `all ${preRows} rows lost in balancing` : `keep share ${(share * 100).toFixed(1)}% outside 40–60% (keep rows ${keeps.length}, reject rows ${rejects.length})`;
   return {
     rows,
     info: {
       status: ok ? "ok" : "infeasible",
-      reason: ok ? null : `keep share ${(share * 100).toFixed(1)}% outside 40–60% (keep rows ${keeps.length}, reject rows ${rejects.length})`,
+      reason,
+      preRows,
       keepRows: keeps.length,
       rejectRows: rejects.length,
       bySource: sourceCounts(g, rows),
@@ -209,14 +221,21 @@ export function buildSplits(articles: ArticleSignals[], seed: number): SplitResu
   const test: LayaRow[] = [];
   const perLang: Record<LangBucket, Record<SupervisionSource, LayaRow[]>> = { fi: emptyGroups(), en: emptyGroups(), other: emptyGroups() };
   let duplicatesDropped = 0;
+  let cohortGroupDropped = 0;
   const rank = (r: LayaRow) => SOURCE_ORDER.indexOf(r.source);
   for (const items of textGroups.values()) {
-    duplicatesDropped += items.length - 1;
     if (items.some((i) => i.cohort)) {
-      const gold = items.filter((i) => i.row.source === "gold").sort((x, y) => (x.row.id < y.row.id ? -1 : x.row.id > y.row.id ? 1 : 0));
-      if (gold.length) test.push(gold[0].row);
+      // Prefer gold rows from cohort articles; fall back to the lowest-id gold row of the group.
+      const byRowId = (x: { row: LayaRow }, y: { row: LayaRow }) => (x.row.id < y.row.id ? -1 : x.row.id > y.row.id ? 1 : 0);
+      const golds = items.filter((i) => i.row.source === "gold");
+      const pick = [...golds.filter((i) => i.cohort).sort(byRowId), ...golds.sort(byRowId)][0];
+      if (pick) {
+        test.push(pick.row);
+        duplicatesDropped += items.length - 1;
+      } else cohortGroupDropped += items.length;
       continue;
     }
+    duplicatesDropped += items.length - 1;
     const best = items.reduce((b, i) => (rank(i.row) < rank(b.row) || (rank(i.row) === rank(b.row) && i.row.id < b.row.id) ? i : b));
     perLang[bucketOf(best.row.language)][best.row.source].push(best.row);
   }
@@ -234,7 +253,7 @@ export function buildSplits(articles: ArticleSignals[], seed: number): SplitResu
 
   const keepRows = rows.filter((r) => r.label === "keep").length;
   const rejectRows = rows.length - keepRows;
-  const failing = LANGS.filter((l) => byLanguage[l].keepRows + byLanguage[l].rejectRows >= 100 && byLanguage[l].status !== "ok");
+  const failing = LANGS.filter((l) => byLanguage[l].preRows >= 100 && byLanguage[l].status !== "ok");
   const meanTarget = rows.length ? rows.reduce((s, r) => s + r.gold.keep.probabilities.true, 0) / rows.length : 0;
 
   const val: LayaRow[] = [];
@@ -252,6 +271,7 @@ export function buildSplits(articles: ArticleSignals[], seed: number): SplitResu
       rejectRows,
       meanTarget: round(meanTarget),
       duplicatesDropped,
+      cohortGroupDropped,
       bySource: sourceCounts(pre, rows),
       byLanguage,
     },
