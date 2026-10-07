@@ -57,6 +57,12 @@ export default async function AdminLayout({
             >
               Flagged
             </Link>
+            <Link
+              href="/admin/jev"
+              className="px-3 py-1.5 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground text-xs font-medium"
+            >
+              Jev
+            </Link>
           </nav>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span>{session.user?.email}</span>
