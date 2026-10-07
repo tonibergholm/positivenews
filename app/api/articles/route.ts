@@ -5,6 +5,7 @@ import { CATEGORIES } from "@/src/config/sources";
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 20;
+const FEED_MAX_AGE_DAYS = Math.max(1, parseInt(process.env.FEED_MAX_AGE_DAYS ?? "14", 10) || 14);
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -18,8 +19,12 @@ export async function GET(request: NextRequest) {
   const rawSourceId = searchParams.get("sourceId");
   const sourceId = rawSourceId?.match(/^c[a-z0-9]{24}$/) ? rawSourceId : null;
 
+  // Old articles stay in the database as training data but drop out of the feed.
+  const since = new Date(Date.now() - FEED_MAX_AGE_DAYS * 24 * 60 * 60 * 1000);
+
   const where = {
     isPositive: true,
+    publishedAt: { gte: since },
     ...(category && category !== "All" ? { category } : {}),
     ...(sourceId ? { sourceId } : {}),
   };
