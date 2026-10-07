@@ -14,6 +14,7 @@ export interface ScoreRow {
   keyword: boolean;
   ollama: "keep" | "reject" | null;
   jev: "keep" | "reject" | null;
+  laya: "keep" | "reject" | null;
   flagged: boolean;
 }
 
@@ -23,6 +24,7 @@ export interface ScoreTable {
   labels: Record<Slice, number>;
   ollama: Record<Slice, BinaryScore>;
   jev: Record<Slice, BinaryScore>;
+  laya: Record<Slice, BinaryScore>;
   keyword: Record<Slice, RejectOnlyScore>;
   flags: Record<Slice, RejectOnlyScore>;
 }
@@ -41,6 +43,7 @@ function scoreTable(rows: ScoreRow[]): ScoreTable {
     labels: { all: 0, fi: 0, en: 0 },
     ollama: perSlice(emptyBinary),
     jev: perSlice(emptyBinary),
+    laya: perSlice(emptyBinary),
     keyword: perSlice(emptyRejectOnly),
     flags: perSlice(emptyRejectOnly),
   };
@@ -48,7 +51,7 @@ function scoreTable(rows: ScoreRow[]): ScoreTable {
   for (const r of rows) {
     for (const s of slicesFor(r.language)) {
       t.labels[s]++;
-      for (const key of ["ollama", "jev"] as const) {
+      for (const key of ["ollama", "jev", "laya"] as const) {
         const v = r[key];
         if (!v) continue;
         const b = t[key][s];
@@ -72,7 +75,7 @@ function scoreTable(rows: ScoreRow[]): ScoreTable {
   }
 
   for (const s of SLICES) {
-    for (const key of ["ollama", "jev"] as const) {
+    for (const key of ["ollama", "jev", "laya"] as const) {
       const b = t[key][s];
       b.agreement = ratio(b.agree, b.n);
       b.rejectPrecision = ratio(b.rejectsCorrect, b.rejects);
