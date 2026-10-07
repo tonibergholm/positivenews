@@ -34,7 +34,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           </Link>
         </div>
       ) : card ? (
-        <ReviewCardView key={card.articleId} card={card} categories={categories} skip={[...skip]} more={more} />
+        <ReviewCardView key={`${card.articleId}:${one(params.t) ?? ""}`} card={card} categories={categories} skip={[...skip]} more={more} />
       ) : (
         <p className="text-sm text-muted-foreground">Nothing to review right now.</p>
       )}

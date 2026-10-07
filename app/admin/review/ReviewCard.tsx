@@ -72,6 +72,7 @@ export function ReviewCardView({ card, categories, skip, more }: Props) {
       if (s.length) query.set("skip", s.join(","));
       if (more) query.set("more", "1");
       if (extra.focus) query.set("focus", extra.focus);
+      query.set("t", String(Date.now())); // nonce: remount the card even if the same article comes back
       const qs = query.toString();
       router.replace(qs ? `/admin/review?${qs}` : "/admin/review");
       router.refresh();
@@ -137,6 +138,14 @@ export function ReviewCardView({ card, categories, skip, more }: Props) {
           return;
         }
         setLast(null);
+        if (mounted.current) {
+          setReveal(null);
+          setPicking(false);
+          setError(null);
+        }
+        busy.current = false;
+        if (timer.current) clearTimeout(timer.current);
+        timer.current = null;
         go({ focus: last.articleId });
       } catch {
         setError(TRANSIENT);
