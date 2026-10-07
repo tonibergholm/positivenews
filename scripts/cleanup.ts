@@ -1,5 +1,6 @@
 /**
  * Cleanup script — deletes articles older than 14 days.
+ * Articles with any LabelEvent or JevEvaluation are kept: they are training data.
  * Usage: npx tsx scripts/cleanup.ts
  * Cron:  0 3 * * * cd /path/to/positivenews && npx tsx scripts/cleanup.ts >> /var/log/positivenews-cleanup.log 2>&1
  */
@@ -11,7 +12,7 @@ async function main() {
   console.log(`[cleanup] Deleting articles published before ${cutoff.toISOString()}…`);
 
   const { count } = await prisma.article.deleteMany({
-    where: { publishedAt: { lt: cutoff } },
+    where: { publishedAt: { lt: cutoff }, labelEvents: { none: {} }, jevEvaluations: { none: {} } },
   });
 
   console.log(`[cleanup] Done — deleted ${count} articles`);

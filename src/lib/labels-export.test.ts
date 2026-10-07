@@ -22,4 +22,10 @@ describe("toExportRow", () => {
     expect(toExportRow(art(idInCohort(true), [ev({})]))?.split).toBe("test");
     expect(toExportRow(art(idInCohort(false), []))).toBeNull();
   });
+
+  it("keeps a cohort article with an admin reject in bucket leak as gold test data", () => {
+    const row = toExportRow(art(idInCohort(true), [ev({ source: "admin", verdict: "reject", category: "cat_war", bucket: "leak" })]));
+    expect(row?.split).toBe("test");
+    expect(row?.tier).toBe("gold");
+  });
 });

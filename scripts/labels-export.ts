@@ -35,10 +35,9 @@ async function main() {
 
   for (;;) {
     const batch = await prisma.article.findMany({
-      where: { labelEvents: { some: { createdAt: { lt: cutoff } } } },
+      where: { labelEvents: { some: { createdAt: { lt: cutoff } } }, ...(cursor ? { id: { gt: cursor } } : {}) },
       orderBy: { id: "asc" },
       take: BATCH,
-      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
       select: {
         id: true,
         title: true,

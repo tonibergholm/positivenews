@@ -34,7 +34,7 @@ function StatTile({ label, value, detail }: { label: string; value: string; deta
 function Matrix({ a }: { a: Agreement }) {
   const cell = "px-4 py-2.5 text-right tabular-nums";
   return (
-    <div className="rounded-lg border border-border overflow-hidden">
+    <div className="rounded-lg border border-border overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-secondary/60 border-b border-border text-xs text-muted-foreground">
@@ -102,7 +102,7 @@ function ScoreTableView({ title, table }: { title: string; table: ScoreTable }) 
   return (
     <div>
       <h3 className="text-sm font-medium text-foreground mb-2">{title}</h3>
-      <div className="rounded-lg border border-border overflow-hidden">
+      <div className="rounded-lg border border-border overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-secondary/60 border-b border-border text-xs text-muted-foreground">
