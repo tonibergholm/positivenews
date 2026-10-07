@@ -45,7 +45,10 @@ export function selectNext(
     const b = bucketOf(c);
     if (b) groups[b].push(c);
   }
-  for (const b of TARGETED) groups[b].sort((x, y) => x.createdAt.getTime() - y.createdAt.getTime());
+  for (const b of TARGETED)
+    groups[b].sort(
+      (x, y) => x.createdAt.getTime() - y.createdAt.getTime() || (x.articleId < y.articleId ? -1 : x.articleId > y.articleId ? 1 : 0),
+    );
   groups.cohort.sort((x, y) => (dayHash(x.articleId, opts.date) < dayHash(y.articleId, opts.date) ? -1 : 1));
 
   const pick = (b: QueueBucket) => (groups[b].length > 0 ? { candidate: groups[b][0], bucket: b } : null);
@@ -90,10 +93,21 @@ export function helsinkiDate(d: Date): string {
   return DATE_FMT.format(d);
 }
 
-/** Midnight Europe/Helsinki of d's Helsinki date (uses d's UTC offset). */
+function helsinkiParts(d: Date) {
+  return Object.fromEntries(PARTS_FMT.formatToParts(d).map((p) => [p.type, p.value]));
+}
+
+/** Helsinki wall-clock minus UTC at instant x, in ms. */
+function helsinkiOffsetMs(x: Date): number {
+  const p = helsinkiParts(x);
+  const wallAsUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second);
+  return wallAsUtc - Math.floor(x.getTime() / 1000) * 1000;
+}
+
+/** Midnight Europe/Helsinki of d's Helsinki date, using the offset in force at that midnight. */
 export function startOfHelsinkiDay(d: Date): Date {
-  const parts = Object.fromEntries(PARTS_FMT.formatToParts(d).map((p) => [p.type, p.value]));
-  const wallAsUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour % 24, +parts.minute, +parts.second);
-  const offsetMs = wallAsUtc - Math.floor(d.getTime() / 1000) * 1000;
-  return new Date(Date.UTC(+parts.year, +parts.month - 1, +parts.day) - offsetMs);
+  const p = helsinkiParts(d);
+  const midnightAsUtc = Date.UTC(+p.year, +p.month - 1, +p.day);
+  const guess = midnightAsUtc - helsinkiOffsetMs(d);
+  return new Date(midnightAsUtc - helsinkiOffsetMs(new Date(guess)));
 }

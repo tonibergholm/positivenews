@@ -49,15 +49,18 @@ async function todaysDecisions(now: Date) {
     select: ADMIN_EVENT_SELECT,
   });
   const retracted = new Set(events.filter((e) => e.verdict === "retract").map((e) => e.retractsId));
-  return events.filter((e) => e.verdict !== "retract" && e.bucket && !retracted.has(e.id));
+  // Only queue buckets count; "manual" decisions sit outside the quotas.
+  return events.filter((e) => e.verdict !== "retract" && e.bucket && e.bucket in QUOTAS && !retracted.has(e.id));
+}
+
+function countByBucket(events: { bucket: string | null }[]): Record<QueueBucket, number> {
+  const counts: Record<QueueBucket, number> = { flagged: 0, leak: 0, miss: 0, cohort: 0 };
+  for (const e of events) counts[e.bucket as QueueBucket]++;
+  return counts;
 }
 
 export async function loadDecidedToday(now = new Date()): Promise<Record<QueueBucket, number>> {
-  const counts: Record<QueueBucket, number> = { flagged: 0, leak: 0, miss: 0, cohort: 0 };
-  for (const e of await todaysDecisions(now)) {
-    if (e.bucket && e.bucket in QUOTAS) counts[e.bucket as QueueBucket]++;
-  }
-  return counts;
+  return countByBucket(await todaysDecisions(now));
 }
 
 export async function todayCount(now = new Date()): Promise<number> {
@@ -66,7 +69,9 @@ export async function todayCount(now = new Date()): Promise<number> {
 
 export async function loadNextCard(opts: { exclude: ReadonlySet<string>; focus?: string | null; now?: Date }) {
   const now = opts.now ?? new Date();
-  const [candidates, decided, doneToday] = await Promise.all([loadCandidates(now), loadDecidedToday(now), todayCount(now)]);
+  const [candidates, decisions] = await Promise.all([loadCandidates(now), todaysDecisions(now)]);
+  const decided = countByBucket(decisions);
+  const doneToday = decisions.length;
 
   let chosen: { candidate: QueueCandidate; bucket: ReviewBucket } | null = null;
   if (opts.focus) {

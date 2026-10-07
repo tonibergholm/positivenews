@@ -70,6 +70,15 @@ describe("selectNext", () => {
     expect(selectNext(pool, d, { date: DATE })?.bucket).toBe("flagged");
   });
 
+  it("breaks createdAt ties by article id, whatever the input order", () => {
+    const at = new Date(Date.UTC(2026, 9, 2));
+    const jev = { positiveP: 0.1, upliftingP: 0.9, topCategoryP: 0 };
+    const x = cand({ articleId: "tie-b", createdAt: at, jev });
+    const y = cand({ articleId: "tie-a", createdAt: at, jev });
+    expect(selectNext([x, y], zero(), { date: DATE })?.candidate.articleId).toBe("tie-a");
+    expect(selectNext([y, x], zero(), { date: DATE })?.candidate.articleId).toBe("tie-a");
+  });
+
   it("ignores candidates that belong to no bucket", () => {
     expect(selectNext([cand({ inFeed: true, jev: null })], zero(), { date: DATE })).toBeNull();
   });
@@ -80,5 +89,10 @@ describe("Helsinki day", () => {
     expect(helsinkiDate(new Date("2026-10-07T21:30:00Z"))).toBe("2026-10-08");
     expect(startOfHelsinkiDay(new Date("2026-10-07T21:30:00Z")).toISOString()).toBe("2026-10-07T21:00:00.000Z");
     expect(startOfHelsinkiDay(new Date("2026-12-01T10:00:00Z")).toISOString()).toBe("2026-11-30T22:00:00.000Z");
+  });
+
+  it("uses the offset at midnight on DST transition days", () => {
+    expect(startOfHelsinkiDay(new Date("2026-10-25T05:00:00Z")).toISOString()).toBe("2026-10-24T21:00:00.000Z");
+    expect(startOfHelsinkiDay(new Date("2027-03-28T10:00:00Z")).toISOString()).toBe("2027-03-27T22:00:00.000Z");
   });
 });
