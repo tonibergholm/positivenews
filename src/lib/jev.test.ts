@@ -83,6 +83,12 @@ describe("summarizeAnswers", () => {
     expect(() => summarizeAnswers(answers({ uplifting: { type: "noul", noul: Number.NaN } }))).toThrow(/uplifting/);
     expect(() => summarizeAnswers(answers({ uplift: { type: "noul", noul: 1 } }))).toThrow(/uplift/);
   });
+
+  it("throws, naming the key, when a value is out of range", () => {
+    expect(() => summarizeAnswers(answers({ positive: { type: "noul", noul: 1.5 } }))).toThrow(/positive/);
+    expect(() => summarizeAnswers(answers({ cat_war: { type: "noul", noul: -0.1 } }))).toThrow(/cat_war/);
+    expect(() => summarizeAnswers(answers({ uplift: { type: "score", score: 3.5 } }))).toThrow(/uplift/);
+  });
 });
 
 describe("deriveVerdict", () => {

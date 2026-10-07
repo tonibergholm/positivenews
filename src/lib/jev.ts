@@ -7,7 +7,7 @@
  * without calling Jev again.
  */
 
-import { noul, score, TypeSafeClient, type Questions } from "@typesafe-ai/sdk";
+import { noul, score, TypeSafeClient, type Questions, type RequestOptions } from "@typesafe-ai/sdk";
 
 export const JEV_DEFAULT_MODEL = "jev-1.13.0";
 /** Bump whenever a question, criterion, or the state format changes. */
@@ -178,11 +178,17 @@ export interface JevSummary {
 
 type RawAnswer = { type?: unknown; noul?: unknown; score?: unknown };
 
+const RANGES = { noul: [0, 1], score: [0, 3] } as const;
+
 function numberField(answers: Record<string, unknown>, key: string, type: "noul" | "score"): number {
   const answer = answers[key] as RawAnswer | undefined;
   const value = answer?.[type];
   if (!answer || answer.type !== type || typeof value !== "number" || !Number.isFinite(value)) {
     throw new Error(`Jev answer "${key}" is missing or not a valid ${type}`);
+  }
+  const [min, max] = RANGES[type];
+  if (value < min || value > max) {
+    throw new Error(`Jev answer "${key}" ${type} ${value} is outside [${min}, ${max}]`);
   }
   return value;
 }
@@ -264,9 +270,9 @@ function getClient(): TypeSafeClient {
   return client;
 }
 
-export async function evaluateArticle(article: JevArticle): Promise<JevEvaluationData> {
+export async function evaluateArticle(article: JevArticle, options?: RequestOptions): Promise<JevEvaluationData> {
   const started = Date.now();
-  const res = await getClient().systemOne({ state: buildState(article), questions: QUESTIONS });
+  const res = await getClient().systemOne({ state: buildState(article), questions: QUESTIONS }, options);
   const answers = res.answers as Record<string, unknown>;
 
   return {

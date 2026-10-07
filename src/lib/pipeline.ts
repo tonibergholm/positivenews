@@ -5,6 +5,7 @@ import { shadowEvaluate } from "./jev-shadow";
 
 const JEV_SHADOW_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 const JEV_SHADOW_LIMIT = 100;
+const JEV_SHADOW_BUDGET_MS = 90_000;
 
 interface PipelineResult {
   total: number;
@@ -35,6 +36,7 @@ export async function runPipeline(): Promise<PipelineResult> {
       await shadowEvaluate({
         since: new Date(Date.now() - JEV_SHADOW_WINDOW_MS),
         limit: JEV_SHADOW_LIMIT,
+        budgetMs: JEV_SHADOW_BUDGET_MS,
       });
     } catch (err) {
       console.error("[pipeline] Jev shadow evaluation failed:", err);

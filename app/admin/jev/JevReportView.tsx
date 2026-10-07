@@ -178,7 +178,7 @@ export function JevReportView({
       <p className="text-xs text-muted-foreground tabular-nums">
         {report.evaluated} evaluations · model {report.models.join(", ")} · question set {questionSet} ·
         thresholds positive ≥ {thresholds.positiveMin}, uplifting ≥ {thresholds.upliftingMin}, category ≤{" "}
-        {thresholds.categoryMax} · {report.groups.pending} pending curation (excluded)
+        {thresholds.categoryMax} · {report.groups.pending} pending curation (excluded) · Ollama fail-open keeps (during Ollama outages) count as keeps
       </p>
 
       <section>
@@ -197,11 +197,19 @@ export function JevReportView({
           value={pct(flagged.rate)}
           detail={`${flagged.jevRejects} of ${flagged.total} (Ollama kept all of them)`}
         />
-        <StatTile
-          label="Keyword-rejected articles Jev would keep"
-          value={pct(keyword.rate)}
-          detail={`${keyword.jevKeeps} of ${keyword.total}`}
-        />
+        <div>
+          <StatTile
+            label="Keyword-rejected articles Jev would keep"
+            value={pct(keyword.rate)}
+            detail={`${keyword.jevKeeps} of ${keyword.total}`}
+          />
+          <Link
+            href={{ pathname: "/admin/jev", query: { group: "keyword", direction: "jev_keeps" } }}
+            className="mt-2 inline-block text-xs text-primary hover:underline"
+          >
+            Show these articles
+          </Link>
+        </div>
       </section>
 
       <section>

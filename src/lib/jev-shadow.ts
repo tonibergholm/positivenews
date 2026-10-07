@@ -18,12 +18,17 @@ export interface ShadowOptions {
   since: Date;
   limit: number;
   concurrency?: number;
+  /** Stop starting new articles after this many ms; the rest wait for the next run. */
+  budgetMs?: number;
 }
+
+const SHADOW_REQUEST_OPTIONS = { timeout: 10_000, retry: { maxRetries: 1 } };
 
 export async function shadowEvaluate({
   since,
   limit,
   concurrency = 5,
+  budgetMs,
 }: ShadowOptions): Promise<{ evaluated: number; failed: number }> {
   if (!isJevConfigured()) return { evaluated: 0, failed: 0 };
 
@@ -48,7 +53,7 @@ export async function shadowEvaluate({
     async (article) => {
       let data: JevEvaluationData;
       try {
-        data = await evaluateArticle(article);
+        data = await evaluateArticle(article, SHADOW_REQUEST_OPTIONS);
       } catch (err) {
         console.error(`[jev] Article ${article.id} failed: ${err instanceof Error ? err.message : err}`);
         throw err;
@@ -78,9 +83,11 @@ export async function shadowEvaluate({
       }
     },
     isFatalJevError,
+    budgetMs === undefined ? undefined : Date.now() + budgetMs,
   );
 
   if (result.aborted) console.error("[jev] Stopped early after a non-retryable API error");
+  if (result.timedOut) console.log("[jev] Stopped at time budget; remaining articles will be picked up next run");
   console.log(`[jev] Done — ${result.succeeded} evaluated, ${result.failed} failed`);
 
   return { evaluated: result.succeeded, failed: result.failed };
