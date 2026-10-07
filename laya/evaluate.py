@@ -57,6 +57,8 @@ def main():
     (ck / "report.md").write_text(
         f"# {ck.name}\n\ngate: **{report['gate']}**{' (test set < 50: indicative only)' if report['indicative_only'] else ''}\n\n"
         f"val: n={v['n']} bal_acc={v['balanced_accuracy']} ece={v['ece']} majority={v['majority_baseline']}\n\n"
+        + "".join(f"val {lang}: n={m['n']} bal_acc={m['balanced_accuracy']} acc={m['accuracy']} majority={m['majority_baseline']}\n"
+                  for lang in ("fi", "en") for m in (report["val"]["positivenews"][lang],)) + "\n"
         f"test: n={t['n']} bal_acc={t['balanced_accuracy']} ece={t['ece']}\n\n"
         + "reason top-1 (rows with gold.reason): "
         + ", ".join(f"{s} n={report['reason'][s]['positivenews']['n']} acc={report['reason'][s]['positivenews']['accuracy']}"
