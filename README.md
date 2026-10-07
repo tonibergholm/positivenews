@@ -188,6 +188,17 @@ pnpm jev:backfill --days 30 --limit 500 # evaluate existing articles and print t
 
 Bump `QUESTION_SET` in `src/lib/jev.ts` after changing any question so old and new results are not mixed.
 
+### Feed window and cleanup
+
+The public feed only shows articles published in the last 14 days (`FEED_MAX_AGE_DAYS`). Older articles stay in the database as training data. A nightly cron deletes only old articles that have no labels or Jev evaluations and aren't from a trusted source:
+
+```bash
+mkdir -p ~/logs
+# crontab -e
+0 3 * * * cd /home/toni/apps/positivenews && npx tsx scripts/cleanup.ts >> $HOME/logs/positivenews-cleanup.log 2>&1
+npx tsx scripts/cleanup.ts --dry-run   # show what would be deleted
+```
+
 ### Labels and review queue
 
 Every filtering judgement is stored as a `LabelEvent`: keyword rejects, Ollama verdicts, reader flags and admin decisions. Review about 20 articles a day at `/news/admin/review`. Your decisions are final and update the feed. They also train and test the filter: a fixed ~10% test cohort never appears in training exports.
