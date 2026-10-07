@@ -28,17 +28,17 @@ type RowData = Omit<Prisma.LabelEventCreateManyInput, "articleId" | "backfilled"
 
 async function main() {
   const before = beforeArg();
-  const counts = { scanned: 0, keyword: 0, ollama_reject: 0, ollama_keep_unverified: 0, flag: 0, skipped: 0 };
+  const counts = { scanned: 0, keyword: 0, ollama_reject: 0, ollama_keep_unverified: 0, flag: 0, excludedLive: 0, skipped: 0 };
   let cursor: string | undefined;
 
-  console.log(`[labels-backfill] articles created before ${before.toISOString()}`);
+  const toScan = await prisma.article.count({ where: { createdAt: { lt: before } } });
+  console.log(`[labels-backfill] articles created before ${before.toISOString()}: ${toScan} to scan`);
 
   for (;;) {
     const batch = await prisma.article.findMany({
-      where: { createdAt: { lt: before } },
+      where: { createdAt: { lt: before }, ...(cursor ? { id: { gt: cursor } } : {}) },
       orderBy: { id: "asc" },
       take: BATCH,
-      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
       select: {
         id: true,
         createdAt: true,
@@ -58,33 +58,55 @@ async function main() {
       const live = new Set(a.labelEvents.map((e) => e.source));
       const rows: Array<{ kind: Kind; data: RowData }> = [];
 
-      if (a.rejectionPass === 0 && !live.has("keyword")) {
-        rows.push({ kind: "keyword", data: { source: "keyword", verdict: "reject", reason: a.rejectionReason, createdAt: a.createdAt } });
-      } else if ((a.rejectionPass === 1 || a.rejectionPass === 2) && !live.has("ollama")) {
-        rows.push({ kind: "ollama", data: { source: "ollama", verdict: "reject", reason: a.rejectionReason, pass: a.rejectionPass, createdAt: a.curatedAt ?? a.createdAt } });
-      } else if (a.curatedAt && a.rejectionPass === null && !trusted.has(a.source.url) && !live.has("ollama")) {
-        rows.push({ kind: "ollama", data: { source: "ollama", verdict: "keep", reason: "historical approval (unverified)", pass: 2, eligible: false, createdAt: a.curatedAt } });
+      if (a.rejectionPass === 0) {
+        if (live.has("keyword")) counts.excludedLive++;
+        else rows.push({ kind: "keyword", data: { source: "keyword", verdict: "reject", reason: a.rejectionReason, createdAt: a.createdAt } });
+      } else if (a.rejectionPass === 1 || a.rejectionPass === 2) {
+        if (live.has("ollama")) counts.excludedLive++;
+        else rows.push({ kind: "ollama", data: { source: "ollama", verdict: "reject", reason: a.rejectionReason, pass: a.rejectionPass, createdAt: a.curatedAt ?? a.createdAt } });
+      } else if (a.curatedAt && a.rejectionPass === null && !trusted.has(a.source.url)) {
+        // An admin keep also sets curatedAt with no rejection; it must not become a made-up Ollama event.
+        if (live.has("ollama") || live.has("admin")) counts.excludedLive++;
+        else rows.push({ kind: "ollama", data: { source: "ollama", verdict: "keep", reason: "historical approval (unverified)", pass: 2, eligible: false, createdAt: a.curatedAt } });
       }
-      if (a.flaggedAt && !live.has("reader_flag")) {
-        rows.push({ kind: "flag", data: { source: "reader_flag", verdict: "reject", createdAt: a.flaggedAt } });
+      if (a.flaggedAt) {
+        if (live.has("reader_flag")) counts.excludedLive++;
+        else rows.push({ kind: "flag", data: { source: "reader_flag", verdict: "reject", createdAt: a.flaggedAt } });
       }
 
       if (rows.length === 0) continue;
 
-      const result = await prisma.labelEvent.createMany({
-        data: rows.map((r) => ({ articleId: a.id, backfilled: true, dedupeKey: `backfill:${a.id}:${r.kind}`, ...r.data })),
-        skipDuplicates: true,
+      const toData = (r: { kind: Kind; data: RowData }) => ({
+        articleId: a.id,
+        backfilled: true,
+        dedupeKey: `backfill:${a.id}:${r.kind}`,
+        ...r.data,
       });
-      counts.skipped += rows.length - result.count;
-      if (result.count === 0) continue;
-      for (const r of rows) {
+
+      // One row: createMany is exact. Several rows: insert one by one so a partial conflict is counted exactly.
+      const inserted: typeof rows = [];
+      if (rows.length === 1) {
+        const result = await prisma.labelEvent.createMany({ data: [toData(rows[0])], skipDuplicates: true });
+        if (result.count === 1) inserted.push(rows[0]);
+      } else {
+        for (const r of rows) {
+          try {
+            await prisma.labelEvent.create({ data: toData(r) });
+            inserted.push(r);
+          } catch (err) {
+            if ((err as { code?: string }).code !== "P2002") throw err;
+          }
+        }
+      }
+      counts.skipped += rows.length - inserted.length;
+      for (const r of inserted) {
         if (r.kind === "keyword") counts.keyword++;
         else if (r.kind === "flag") counts.flag++;
         else if (r.data.verdict === "reject") counts.ollama_reject++;
         else counts.ollama_keep_unverified++;
       }
     }
-    console.log(`[labels-backfill] ${counts.scanned} scanned…`);
+    console.log(`[labels-backfill] ${counts.scanned}/${toScan} scanned…`);
   }
 
   console.log("[labels-backfill] done", counts);
