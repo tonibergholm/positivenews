@@ -2,6 +2,8 @@
 import { DEFAULT_THRESHOLDS, QUESTION_SET } from "@/src/lib/jev";
 import { buildReport } from "@/src/lib/jev-report";
 import { loadReportRows } from "@/src/lib/jev-report-data";
+import { loadScoreRows } from "@/src/lib/scoreboard-data";
+import { scoreSources } from "@/src/lib/scoreboard";
 import { JevReportView, type JevFilters } from "./JevReportView";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +28,7 @@ export default async function JevPage({ searchParams }: { searchParams: Promise<
 
   const rows = await loadReportRows();
   const report = buildReport(rows, DEFAULT_THRESHOLDS);
+  const scores = scoreSources(await loadScoreRows());
 
   return (
     <div className="max-w-6xl">
@@ -44,6 +47,7 @@ export default async function JevPage({ searchParams }: { searchParams: Promise<
       ) : (
         <JevReportView
           report={report}
+          scores={scores}
           filters={filters}
           questionSet={QUESTION_SET}
           thresholds={DEFAULT_THRESHOLDS}

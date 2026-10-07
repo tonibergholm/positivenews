@@ -1,6 +1,7 @@
 // app/admin/jev/JevReportView.tsx
 import Link from "next/link";
 import { CATEGORIES, type JevThresholds } from "@/src/lib/jev";
+import type { ScoreTable, Slice } from "@/src/lib/scoreboard";
 import type { Agreement, Disagreement, JevReport } from "@/src/lib/jev-report";
 
 export interface JevFilters {
@@ -55,6 +56,76 @@ function Matrix({ a }: { a: Agreement }) {
           </tr>
         </tbody>
       </table>
+    </div>
+  );
+}
+
+const SLICE_KEYS: Slice[] = ["all", "fi", "en"];
+
+function Triple({ cells }: { cells: string[] }) {
+  return (
+    <td className="px-4 py-2.5 text-right tabular-nums whitespace-nowrap">{cells.join(" / ")}</td>
+  );
+}
+
+function ScoreTableView({ title, table }: { title: string; table: ScoreTable }) {
+  const rows: { name: string; n: string[]; agreement: string[]; precision: string[]; hidden: string[] }[] = [
+    {
+      name: "Jev",
+      n: SLICE_KEYS.map((s) => String(table.jev[s].n)),
+      agreement: SLICE_KEYS.map((s) => pct(table.jev[s].agreement)),
+      precision: SLICE_KEYS.map((s) => pct(table.jev[s].rejectPrecision)),
+      hidden: SLICE_KEYS.map((s) => String(table.jev[s].wronglyHidden)),
+    },
+    {
+      name: "Ollama",
+      n: SLICE_KEYS.map((s) => String(table.ollama[s].n)),
+      agreement: SLICE_KEYS.map((s) => pct(table.ollama[s].agreement)),
+      precision: SLICE_KEYS.map((s) => pct(table.ollama[s].rejectPrecision)),
+      hidden: SLICE_KEYS.map((s) => String(table.ollama[s].wronglyHidden)),
+    },
+    {
+      name: "Keyword filter",
+      n: SLICE_KEYS.map((s) => String(table.keyword[s].n)),
+      agreement: SLICE_KEYS.map(() => "—"),
+      precision: SLICE_KEYS.map((s) => pct(table.keyword[s].rejectPrecision)),
+      hidden: SLICE_KEYS.map(() => "—"),
+    },
+    {
+      name: "Reader flags",
+      n: SLICE_KEYS.map((s) => String(table.flags[s].n)),
+      agreement: SLICE_KEYS.map(() => "—"),
+      precision: SLICE_KEYS.map((s) => pct(table.flags[s].rejectPrecision)),
+      hidden: SLICE_KEYS.map(() => "—"),
+    },
+  ];
+  return (
+    <div>
+      <h3 className="text-sm font-medium text-foreground mb-2">{title}</h3>
+      <div className="rounded-lg border border-border overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-secondary/60 border-b border-border text-xs text-muted-foreground">
+              <th className="text-left px-4 py-2.5 font-medium">Source</th>
+              <th className="text-right px-4 py-2.5 font-medium">n (all / FI / EN)</th>
+              <th className="text-right px-4 py-2.5 font-medium">Agreement</th>
+              <th className="text-right px-4 py-2.5 font-medium">Reject precision</th>
+              <th className="text-right px-4 py-2.5 font-medium">Wrongly hidden</th>
+            </tr>
+          </thead>
+          <tbody className="text-xs">
+            {rows.map((r) => (
+              <tr key={r.name} className="border-b border-border/60 last:border-0">
+                <td className="px-4 py-2.5 text-muted-foreground">{r.name}</td>
+                <Triple cells={r.n} />
+                <Triple cells={r.agreement} />
+                <Triple cells={r.precision} />
+                <Triple cells={r.hidden} />
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -156,11 +227,13 @@ function DisagreementTable({ rows }: { rows: Disagreement[] }) {
 
 export function JevReportView({
   report,
+  scores,
   filters,
   questionSet,
   thresholds,
 }: {
   report: JevReport;
+  scores: { cohort: ScoreTable; targeted: ScoreTable };
   filters: JevFilters;
   questionSet: string;
   thresholds: JevThresholds;
@@ -178,8 +251,32 @@ export function JevReportView({
       <p className="text-xs text-muted-foreground tabular-nums">
         {report.evaluated} evaluations · model {report.models.join(", ")} · question set {questionSet} ·
         thresholds positive ≥ {thresholds.positiveMin}, uplifting ≥ {thresholds.upliftingMin}, category ≤{" "}
-        {thresholds.categoryMax} · {report.groups.pending} pending curation (excluded) · Ollama fail-open keeps (during Ollama outages) count as keeps
+        {thresholds.categoryMax} · {report.groups.pending} pending curation (excluded) · {report.groups.admin} admin-decided (excluded) · Ollama fail-open keeps (during Ollama outages) count as keeps
       </p>
+
+      <section>
+        <h2 className="text-lg font-medium text-foreground mb-3">Against your decisions</h2>
+        {scores.cohort.labels.all + scores.targeted.labels.all === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No reviewed articles yet — start at{" "}
+            <Link href="/admin/review" className="text-primary hover:underline">
+              Review
+            </Link>
+            .
+          </p>
+        ) : (
+          <>
+            <p className="text-xs text-muted-foreground mb-3">
+              {scores.cohort.labels.all} cohort labels · {scores.targeted.labels.all} targeted — rates firm up as labels
+              accumulate (about 4 cohort reviews a day).
+            </p>
+            <div className="space-y-4">
+              <ScoreTableView title="Random cohort (unbiased)" table={scores.cohort} />
+              <ScoreTableView title="Targeted reviews" table={scores.targeted} />
+            </div>
+          </>
+        )}
+      </section>
 
       <section>
         <h2 className="text-lg font-medium text-foreground mb-3">Agreement with Ollama</h2>

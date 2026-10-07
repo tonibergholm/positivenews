@@ -5,7 +5,7 @@
 
 import { DEFAULT_THRESHOLDS, deriveVerdict, type JevThresholds, type JevVerdict } from "./jev";
 
-export type BaselineGroup = "keyword" | "ollama_reject" | "ollama_keep" | "pending";
+export type BaselineGroup = "keyword" | "ollama_reject" | "ollama_keep" | "pending" | "admin";
 
 export interface ReportRow {
   articleId: string;
@@ -15,6 +15,7 @@ export interface ReportRow {
   createdAt: Date;
   curatedAt: Date | null;
   flaggedAt: Date | null;
+  adminDecided: boolean;
   rejectionPass: number | null;
   rejectionReason: string | null;
   model: string;
@@ -37,7 +38,7 @@ export interface Agreement {
 
 export interface Disagreement {
   row: ReportRow;
-  group: Exclude<BaselineGroup, "pending">;
+  group: Exclude<BaselineGroup, "pending" | "admin">;
   verdict: JevVerdict;
   direction: "jev_keeps" | "jev_rejects";
 }
@@ -52,7 +53,8 @@ export interface JevReport {
   disagreements: Disagreement[];
 }
 
-export function baselineGroup(r: Pick<ReportRow, "rejectionPass" | "curatedAt">): BaselineGroup {
+export function baselineGroup(r: Pick<ReportRow, "rejectionPass" | "curatedAt" | "adminDecided">): BaselineGroup {
+  if (r.adminDecided) return "admin";
   if (r.rejectionPass === 0) return "keyword";
   if (r.rejectionPass === 1 || r.rejectionPass === 2) return "ollama_reject";
   if (r.curatedAt) return "ollama_keep";
@@ -77,7 +79,7 @@ function addToAgreement(a: Agreement, ollamaKeep: boolean, jevKeep: boolean): vo
 }
 
 export function buildReport(rows: ReportRow[], thresholds: JevThresholds = DEFAULT_THRESHOLDS): JevReport {
-  const groups: Record<BaselineGroup, number> = { keyword: 0, ollama_reject: 0, ollama_keep: 0, pending: 0 };
+  const groups: Record<BaselineGroup, number> = { keyword: 0, ollama_reject: 0, ollama_keep: 0, pending: 0, admin: 0 };
   const agreement = { all: emptyAgreement(), fi: emptyAgreement(), en: emptyAgreement() };
   const flagged = { total: 0, jevRejects: 0 };
   const keyword = { total: 0, jevKeeps: 0 };
@@ -86,7 +88,7 @@ export function buildReport(rows: ReportRow[], thresholds: JevThresholds = DEFAU
   for (const row of rows) {
     const group = baselineGroup(row);
     groups[group]++;
-    if (group === "pending") continue;
+    if (group === "pending" || group === "admin") continue;
 
     const verdict = deriveVerdict(row, thresholds);
     const baselineKeep = group === "ollama_keep";
