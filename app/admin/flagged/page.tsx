@@ -8,8 +8,8 @@ export const dynamic = "force-dynamic";
 
 async function getFlaggedArticles() {
   return prisma.article.findMany({
-    where: { flaggedAt: { not: null } },
-    orderBy: { flaggedAt: "desc" },
+    where: { OR: [{ flaggedAt: { not: null } }, { labelEvents: { some: { source: "reader_flag" } } }] },
+    orderBy: [{ flaggedAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
     take: 300,
     select: {
       id: true,
@@ -41,7 +41,12 @@ export default async function FlaggedPage({
         const newestFlag = flagTimes.length ? Math.max(...flagTimes) : (r.flaggedAt?.getTime() ?? null);
         return newestFlag !== null && authority.createdAt.getTime() < newestFlag;
       });
-  const flagged = visible.map((r) => ({ id: r.id, title: r.title, flaggedAt: r.flaggedAt, source: r.source }));
+  const flagged = visible.map((r) => {
+    const times = r.labelEvents.filter((e) => e.source === "reader_flag").map((e) => e.createdAt.getTime());
+    if (r.flaggedAt) times.push(r.flaggedAt.getTime());
+    const newest = times.length ? new Date(Math.max(...times)) : null;
+    return { id: r.id, title: r.title, flaggedAt: newest, source: r.source };
+  });
 
   return (
     <div className="max-w-4xl">

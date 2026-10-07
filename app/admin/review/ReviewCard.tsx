@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore, useTran
 import { useRouter } from "next/navigation";
 import type { ReviewCard } from "@/src/lib/review-queue-data";
 import { decideAction, undoAction, type Reveal } from "./actions";
+import { hasRawLast, readLast, setLast, subscribeLast } from "./last-decision";
 
 interface Props {
   card: ReviewCard;
@@ -12,33 +13,8 @@ interface Props {
   more: boolean;
 }
 
-const LAST_KEY = "review:last"; // sessionStorage: { eventId, articleId }
 const REVEAL_MS = 1500;
-const LAST_EVENT = "review:last-changed";
-
-function subscribeLast(cb: () => void) {
-  window.addEventListener(LAST_EVENT, cb);
-  return () => window.removeEventListener(LAST_EVENT, cb);
-}
-function setLast(value: string | null) {
-  if (value === null) sessionStorage.removeItem(LAST_KEY);
-  else sessionStorage.setItem(LAST_KEY, value);
-  window.dispatchEvent(new Event(LAST_EVENT));
-}
-
 const TRANSIENT = "Network error — try again";
-
-function readLast(): { eventId: string; articleId: string } | null {
-  const raw = sessionStorage.getItem(LAST_KEY);
-  if (!raw) return null;
-  try {
-    const v = JSON.parse(raw) as { eventId?: unknown; articleId?: unknown };
-    if (typeof v?.eventId === "string" && typeof v?.articleId === "string") return { eventId: v.eventId, articleId: v.articleId };
-  } catch {
-    // bad JSON: treat as no last decision
-  }
-  return null;
-}
 
 export function ReviewCardView({ card, categories, skip, more }: Props) {
   const router = useRouter();
@@ -81,6 +57,8 @@ export function ReviewCardView({ card, categories, skip, more }: Props) {
     [router, skip, more],
   );
 
+  const skipCard = useCallback(() => go({ skip: [...skip, card.articleId] }), [go, skip, card.articleId]);
+
   const armTimer = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
@@ -98,11 +76,17 @@ export function ReviewCardView({ card, categories, skip, more }: Props) {
         try {
           const r = await decideAction(card.articleId, verdict, category, card.bucket);
           if (!r.ok) {
+            if (r.error === "Article not found") {
+              // The article is gone (e.g. cleaned up); move on to the next card.
+              busy.current = false;
+              setTimeout(skipCard, 0); // outside the transition, like undo
+              return;
+            }
             setError(r.error);
             busy.current = false;
             return;
           }
-          setLast(JSON.stringify({ eventId: r.eventId, articleId: card.articleId }));
+          setLast({ eventId: r.eventId, articleId: card.articleId });
           if (!mounted.current) return;
           setReveal(r.reveal);
           armTimer();
@@ -112,7 +96,7 @@ export function ReviewCardView({ card, categories, skip, more }: Props) {
         }
       });
     },
-    [card, armTimer],
+    [card, armTimer, skipCard],
   );
 
   const undo = useCallback(() => {
@@ -121,7 +105,7 @@ export function ReviewCardView({ card, categories, skip, more }: Props) {
     if (undoing.current) return; // one undo at a time
     const last = readLast();
     if (!last) {
-      if (sessionStorage.getItem(LAST_KEY)) setLast(null);
+      if (hasRawLast()) setLast(null);
       return;
     }
     const wasReveal = busy.current;
@@ -161,8 +145,6 @@ export function ReviewCardView({ card, categories, skip, more }: Props) {
       }
     });
   }, [go, reveal, armTimer]);
-
-  const skipCard = useCallback(() => go({ skip: [...skip, card.articleId] }), [go, skip, card.articleId]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {

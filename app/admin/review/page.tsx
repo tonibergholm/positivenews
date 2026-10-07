@@ -4,6 +4,7 @@ import { loadNextCard } from "@/src/lib/review-queue-data";
 import { DAILY_TARGET } from "@/src/lib/review-queue";
 import { CATEGORIES } from "@/src/lib/jev";
 import { ReviewCardView } from "./ReviewCard";
+import { UndoLast } from "./UndoLast";
 
 export const dynamic = "force-dynamic";
 
@@ -32,11 +33,15 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           <Link href={{ pathname: "/admin/review", query: { more: "1" } }} className="inline-block mt-4 text-sm text-primary hover:underline">
             Keep going
           </Link>
+          <UndoLast />
         </div>
       ) : card ? (
         <ReviewCardView key={`${card.articleId}:${one(params.t) ?? ""}`} card={card} categories={categories} skip={[...skip]} more={more} />
       ) : (
-        <p className="text-sm text-muted-foreground">Nothing to review right now.</p>
+        <div>
+          <p className="text-sm text-muted-foreground">Nothing to review right now.</p>
+          <UndoLast />
+        </div>
       )}
 
       <p className="text-xs text-muted-foreground mt-6">

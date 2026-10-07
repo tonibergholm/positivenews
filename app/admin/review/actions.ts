@@ -50,7 +50,15 @@ export async function decideAction(articleId: string, verdict: "keep" | "reject"
   try {
     const r = await recordAdminDecision(articleId, verdict, { category, bucket: bucket as ReviewBucket, actor: who });
     if (r.status === "not_found") return { ok: false as const, error: "Article not found" };
-    return { ok: true as const, eventId: r.eventId, reveal: await loadReveal(articleId) };
+    // The decision is saved; a reveal failure must not turn it into an error.
+    let reveal: Reveal;
+    try {
+      reveal = await loadReveal(articleId);
+    } catch (err) {
+      console.error("[review] reveal failed:", err);
+      reveal = { ollama: null, keyword: false, jev: null };
+    }
+    return { ok: true as const, eventId: r.eventId, reveal };
   } catch (err) {
     console.error("[review] decide failed:", err);
     return { ok: false as const, error: "Could not save decision" };
