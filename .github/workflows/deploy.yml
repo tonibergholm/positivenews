@@ -26,9 +26,8 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      # Uncomment when tests are added (sub-projects B/C/D):
-      # - name: Test
-      #   run: pnpm test
+      - name: Test
+        run: pnpm test
 
   deploy:
     needs: test

@@ -175,6 +175,17 @@ PORT=3001 pnpm start
 
 The feed scheduler starts automatically on server boot via the Next.js instrumentation hook. Ingestion and LLM curation run every 15 minutes. No separate cron setup needed.
 
+### Jev shadow evaluation (optional)
+
+With `TYPESAFE_API_KEY` set, every pipeline run also evaluates recent non-trusted articles with [TypeSafe Jev](https://docs.typesafe.ai) and stores the answers in `JevEvaluation`. Jev does not change what the feed shows. Compare it with the Ollama curator at `/news/admin/jev`.
+
+```bash
+pnpm jev:smoke                          # live check of fixed FI/EN headlines
+pnpm jev:backfill --days 30 --limit 500 # evaluate existing articles and print the comparison
+```
+
+Bump `QUESTION_SET` in `src/lib/jev.ts` after changing any question so old and new results are not mixed.
+
 ### Initial seed
 
 On first run, wait 15 minutes for the scheduler to trigger, or seed manually:
