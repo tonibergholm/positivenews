@@ -36,6 +36,7 @@ model Article {
   rejectionReason String?
   rejectionPass   Int?
   createdAt       DateTime  @default(now())
+  jevEvaluations  JevEvaluation[]
 }
 
 model LearnedKeyword {
@@ -59,4 +60,23 @@ model LearnedKeywordFlag {
   createdAt DateTime @default(now())
 
   @@unique([keyword, language, ip])
+}
+
+model JevEvaluation {
+  id           String   @id @default(cuid())
+  article      Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  articleId    String
+  model        String
+  questionSet  String
+  answers      Json
+  positiveP    Float
+  upliftingP   Float
+  upliftScore  Float
+  topCategory  String
+  topCategoryP Float
+  inputTokens  Int
+  latencyMs    Int
+  createdAt    DateTime @default(now())
+
+  @@unique([articleId, questionSet])
 }
