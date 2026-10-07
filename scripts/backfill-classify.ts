@@ -1,4 +1,6 @@
 /**
+ * LEGACY: bypasses the decision path; skips articles with an admin decision.
+ *
  * Retroactively classifies all existing articles using keyword-based filter.
  * - Trusted sources (curated positive outlets) are skipped — kept as positive.
  * - General sources are classified; articles matching negative keywords get isPositive=false.
@@ -47,7 +49,22 @@ async function main() {
 
     const updates: string[] = [];
 
+    const adminDecided = new Set(
+      (
+        await prisma.labelEvent.findMany({
+          where: { source: "admin", articleId: { in: batch.map((a) => a.id) } },
+          select: { articleId: true },
+        })
+      ).map((e) => e.articleId)
+    );
+
     for (const article of batch) {
+      if (adminDecided.has(article.id)) {
+        skipped++;
+        processed++;
+        continue;
+      }
+
       const info = sourceInfo.get(article.source.name);
       const trusted = info?.trusted ?? false;
       const language = info?.language ?? "en";
@@ -64,11 +81,13 @@ async function main() {
       processed++;
     }
 
-    // Batch update all rejected articles
-    if (updates.length > 0) {
-      await prisma.article.updateMany({
-        where: { id: { in: updates } },
-        data: { isPositive: false },
+    // Update each article under a row lock, re-checking for an admin decision made since the pre-filter.
+    for (const id of updates) {
+      await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "Article" WHERE id = ${id} FOR UPDATE`;
+        const decided = await tx.labelEvent.findFirst({ where: { articleId: id, source: "admin" }, select: { id: true } });
+        if (decided) return;
+        await tx.article.update({ where: { id }, data: { isPositive: false } });
       });
     }
 

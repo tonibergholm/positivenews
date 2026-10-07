@@ -2,6 +2,8 @@
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import { prisma } from "@/src/lib/prisma";
+import { todayCount } from "@/src/lib/review-queue-data";
+import { DAILY_TARGET } from "@/src/lib/review-queue";
 
 async function getPendingKeywordCount(): Promise<number> {
   const minHits = parseInt(process.env.KEYWORD_MIN_HITS ?? "5", 10);
@@ -21,22 +23,31 @@ export default async function AdminLayout({
   // The proxy handles auth protection; the layout just adds the nav for authenticated users.
   if (!session) return <>{children}</>;
 
-  const pendingCount = await getPendingKeywordCount().catch(() => 0);
+  const [pendingCount, reviewCount] = await Promise.all([
+    getPendingKeywordCount().catch(() => 0),
+    todayCount().catch(() => 0),
+  ]);
 
   return (
     <div>
       <div className="border-b border-border/60 bg-secondary/40 mb-6 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-1 text-sm py-2 max-w-7xl mx-auto">
-          <nav className="flex items-center gap-1 flex-1">
+          <nav className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto whitespace-nowrap">
+            <Link
+              href="/admin/review"
+              className="shrink-0 px-3 py-1.5 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground text-xs font-medium tabular-nums"
+            >
+              Review {reviewCount}/{DAILY_TARGET}
+            </Link>
             <Link
               href="/admin"
-              className="px-3 py-1.5 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground text-xs font-medium"
+              className="shrink-0 px-3 py-1.5 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground text-xs font-medium"
             >
               Dashboard
             </Link>
             <Link
               href="/admin/keywords"
-              className="px-3 py-1.5 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground text-xs font-medium flex items-center gap-1.5"
+              className="shrink-0 px-3 py-1.5 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground text-xs font-medium flex items-center gap-1.5"
             >
               Keywords
               {pendingCount > 0 && (
@@ -47,25 +58,25 @@ export default async function AdminLayout({
             </Link>
             <Link
               href="/admin/rejections"
-              className="px-3 py-1.5 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground text-xs font-medium"
+              className="shrink-0 px-3 py-1.5 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground text-xs font-medium"
             >
               Rejections
             </Link>
             <Link
               href="/admin/flagged"
-              className="px-3 py-1.5 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground text-xs font-medium"
+              className="shrink-0 px-3 py-1.5 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground text-xs font-medium"
             >
               Flagged
             </Link>
             <Link
               href="/admin/jev"
-              className="px-3 py-1.5 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground text-xs font-medium"
+              className="shrink-0 px-3 py-1.5 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground text-xs font-medium"
             >
               Jev
             </Link>
           </nav>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span>{session.user?.email}</span>
+          <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0 pl-2">
+            <span className="hidden sm:inline">{session.user?.email}</span>
             <form
               action={async () => {
                 "use server";

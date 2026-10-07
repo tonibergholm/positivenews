@@ -11,6 +11,8 @@
     "test": "vitest run",
     "jev:smoke": "tsx scripts/jev-smoke.ts",
     "jev:backfill": "tsx scripts/jev-backfill.ts",
+    "labels:backfill": "tsx scripts/labels-backfill.ts",
+    "labels:export": "tsx scripts/labels-export.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

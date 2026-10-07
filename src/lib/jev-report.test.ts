@@ -15,6 +15,7 @@ function row(overrides: Partial<ReportRow>, jev: typeof KEEP = KEEP): ReportRow 
     createdAt: new Date(Date.UTC(2026, 9, 1, 0, seq)),
     curatedAt: null,
     flaggedAt: null,
+    adminDecided: false,
     rejectionPass: null,
     rejectionReason: null,
     model: "jev-1.13.0",
@@ -27,11 +28,12 @@ const curated = new Date(Date.UTC(2026, 9, 1));
 
 describe("baselineGroup", () => {
   it("classifies keyword, Ollama reject, Ollama keep and pending", () => {
-    expect(baselineGroup({ rejectionPass: 0, curatedAt: null })).toBe("keyword");
-    expect(baselineGroup({ rejectionPass: 1, curatedAt: curated })).toBe("ollama_reject");
-    expect(baselineGroup({ rejectionPass: 2, curatedAt: curated })).toBe("ollama_reject");
-    expect(baselineGroup({ rejectionPass: null, curatedAt: curated })).toBe("ollama_keep");
-    expect(baselineGroup({ rejectionPass: null, curatedAt: null })).toBe("pending");
+    expect(baselineGroup({ rejectionPass: 0, curatedAt: null, adminDecided: false })).toBe("keyword");
+    expect(baselineGroup({ rejectionPass: 1, curatedAt: curated, adminDecided: false })).toBe("ollama_reject");
+    expect(baselineGroup({ rejectionPass: 2, curatedAt: curated, adminDecided: false })).toBe("ollama_reject");
+    expect(baselineGroup({ rejectionPass: null, curatedAt: curated, adminDecided: false })).toBe("ollama_keep");
+    expect(baselineGroup({ rejectionPass: null, curatedAt: null, adminDecided: false })).toBe("pending");
+    expect(baselineGroup({ rejectionPass: 0, curatedAt: curated, adminDecided: true })).toBe("admin");
   });
 });
 
@@ -86,7 +88,7 @@ describe("buildReport", () => {
     expect(r.keyword.total).toBe(3);
     expect(r.keyword.jevKeeps).toBe(2);
     expect(r.keyword.rate).toBeCloseTo(2 / 3);
-    expect(r.groups).toEqual({ keyword: 3, ollama_reject: 0, ollama_keep: 2, pending: 1 });
+    expect(r.groups).toEqual({ keyword: 3, ollama_reject: 0, ollama_keep: 2, pending: 1, admin: 0 });
   });
 
   it("lists disagreements newest first with direction, excluding pending", () => {
@@ -99,6 +101,21 @@ describe("buildReport", () => {
     expect(d.map((x) => x.row.articleId)).toEqual([kw.articleId, newer.articleId, older.articleId]);
     expect(d.map((x) => x.direction)).toEqual(["jev_keeps", "jev_rejects", "jev_keeps"]);
     expect(d[1].verdict.topCategory).toBe("cat_war");
+  });
+
+  it("puts admin-decided rows in the admin group and excludes them from comparisons", () => {
+    const rows = [
+      row({ curatedAt: curated, adminDecided: true }, REJECT),
+      row({ rejectionPass: 0, adminDecided: true }, KEEP),
+      row({ curatedAt: curated, flaggedAt: curated, adminDecided: true }, REJECT),
+      row({ curatedAt: curated }, KEEP),
+    ];
+    const r = buildReport(rows);
+    expect(r.groups).toEqual({ keyword: 0, ollama_reject: 0, ollama_keep: 1, pending: 0, admin: 3 });
+    expect(r.agreement.all.total).toBe(1);
+    expect(r.keyword.total).toBe(0);
+    expect(r.flagged.total).toBe(0);
+    expect(r.disagreements).toEqual([]);
   });
 
   it("applies custom thresholds", () => {

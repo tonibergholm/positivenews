@@ -8,7 +8,10 @@
 
 import { prisma } from "./prisma";
 import { curateArticles } from "./llm-curator";
+import { recordOllamaResult } from "./article-decisions";
 import { FEED_SOURCES } from "@/src/config/sources";
+
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "gemma3:4b";
 
 const trustedSourceUrls = new Set(
   FEED_SOURCES.filter((s) => s.trusted).map((s) => s.url)
@@ -51,7 +54,7 @@ export async function curateUnchecked(): Promise<{
 
   if (trusted.length > 0) {
     await prisma.article.updateMany({
-      where: { id: { in: trusted.map((a) => a.id) } },
+      where: { id: { in: trusted.map((a) => a.id) }, isPositive: true, curatedAt: null },
       data: { curatedAt: new Date() },
     });
     console.log(`[curate] Auto-approved ${trusted.length} trusted-source articles`);
@@ -71,46 +74,25 @@ export async function curateUnchecked(): Promise<{
 
   const results = await curateArticles(inputs);
 
-  const approvedIds: string[] = [];
-  const rejectedResults: Array<{ id: string; reason: string; pass: 1 | 2 }> = [];
   let rejected = 0;
+  let approved = 0;
 
   for (const r of results) {
-    if (r.isPositive) {
-      approvedIds.push(r.id);
-    } else {
-      rejectedResults.push({ id: r.id, reason: r.reason, pass: r.pass });
-      rejected++;
-      console.log(`[curate] Rejected: "${needsCuration.find((a) => a.id === r.id)?.title}" — ${r.reason} (pass ${r.pass})`);
+    try {
+      const status = await recordOllamaResult(r.id, { outcome: r.outcome, reason: r.reason, pass: r.pass }, OLLAMA_MODEL);
+      if (status !== "applied") continue;
+      if (r.isPositive) {
+        approved++;
+      } else {
+        rejected++;
+        console.log(`[curate] Rejected: "${needsCuration.find((a) => a.id === r.id)?.title}" — ${r.reason} (pass ${r.pass})`);
+      }
+    } catch (err) {
+      console.error(`[curate] Failed to record result for ${r.id}:`, err);
     }
   }
 
-  const curatedAt = new Date();
-
-  if (approvedIds.length > 0) {
-    await prisma.article.updateMany({
-      where: { id: { in: approvedIds } },
-      data: { curatedAt },
-    });
-  }
-
-  if (rejectedResults.length > 0) {
-    await prisma.$transaction(
-      rejectedResults.map((r) =>
-        prisma.article.update({
-          where: { id: r.id },
-          data: {
-            isPositive: false,
-            curatedAt,
-            rejectionReason: r.reason,
-            rejectionPass: r.pass,
-          },
-        })
-      )
-    );
-  }
-
-  const curated = trusted.length + results.length - rejected;
+  const curated = trusted.length + approved;
   console.log(
     `[curate] Done — ${curated} approved, ${rejected} rejected, ${trusted.length} auto-trusted`
   );

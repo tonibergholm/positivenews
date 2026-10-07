@@ -3,23 +3,13 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/src/lib/prisma";
-
-async function requireAdmin() {
-  const session = await auth();
-  if (!session) redirect("/admin/login");
-}
+import { recordAdminDecision } from "@/src/lib/article-decisions";
 
 export async function unflagArticle(id: string): Promise<void> {
-  await requireAdmin();
-  await prisma.article.update({
-    where: { id },
-    data: {
-      flaggedAt: null,
-      isPositive: true,
-      curatedAt: new Date(),
-    },
-  });
+  const session = await auth();
+  if (!session) redirect("/admin/login");
+  await recordAdminDecision(id, "keep", { bucket: "manual", actor: session.user?.email ?? null });
   revalidatePath("/admin/flagged");
+  revalidatePath("/admin/review");
   revalidatePath("/");
 }

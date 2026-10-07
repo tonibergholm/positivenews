@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { QUESTION_SET } from "./jev";
+import { currentAdminAuthority } from "./labels";
 import type { ReportRow } from "./jev-report";
 
 /** Latest evaluations for the current question set, flattened for buildReport. */
@@ -24,6 +25,10 @@ export async function loadReportRows(max = 5000): Promise<ReportRow[]> {
           rejectionPass: true,
           rejectionReason: true,
           source: { select: { name: true, language: true } },
+          labelEvents: {
+            where: { source: "admin" },
+            select: { id: true, source: true, verdict: true, category: true, eligible: true, bucket: true, retractsId: true, createdAt: true },
+          },
         },
       },
     },
@@ -37,6 +42,7 @@ export async function loadReportRows(max = 5000): Promise<ReportRow[]> {
     createdAt: e.article.createdAt,
     curatedAt: e.article.curatedAt,
     flaggedAt: e.article.flaggedAt,
+    adminDecided: currentAdminAuthority(e.article.labelEvents) !== null,
     rejectionPass: e.article.rejectionPass,
     rejectionReason: e.article.rejectionReason,
     model: e.model,

@@ -179,7 +179,7 @@ The feed scheduler starts automatically on server boot via the Next.js instrumen
 
 With `TYPESAFE_API_KEY` set, every pipeline run also evaluates recent non-trusted articles with [TypeSafe Jev](https://docs.typesafe.ai) and stores the answers in `JevEvaluation`. Jev does not change what the feed shows. Compare it with the Ollama curator at `/news/admin/jev`.
 
-This feature adds the `JevEvaluation` table. The deploy workflow does not run migrations, so run `npx prisma migrate deploy` on the server before or right after deploying.
+Migrations run automatically during deploy (`prisma migrate deploy`).
 
 ```bash
 pnpm jev:smoke                          # live check of fixed FI/EN headlines
@@ -187,6 +187,21 @@ pnpm jev:backfill --days 30 --limit 500 # evaluate existing articles and print t
 ```
 
 Bump `QUESTION_SET` in `src/lib/jev.ts` after changing any question so old and new results are not mixed.
+
+### Labels and review queue
+
+Every filtering judgement is stored as a `LabelEvent`: keyword rejects, Ollama verdicts, reader flags and admin decisions. Review about 20 articles a day at `/news/admin/review`. Your decisions are final and update the feed. They also train and test the filter: a fixed ~10% test cohort never appears in training exports.
+
+```bash
+pnpm labels:backfill                 # one-off: import historical judgements (idempotent)
+pnpm labels:export --out labels.jsonl  # train rows → labels.jsonl, test rows → labels.jsonl.test.jsonl
+```
+
+Run `pnpm labels:backfill` (with no `--before`) right after the deploy and before the first review.
+
+The unbiased test set is the rows of `<out>.test.jsonl` with `tier = gold` and `bucket = cohort`. Other test rows are cohort articles with weaker labels.
+
+The scoreboard at `/news/admin/jev` ("Against your decisions") rates each source against your reviews.
 
 ### Initial seed
 
