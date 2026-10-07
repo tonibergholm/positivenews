@@ -81,11 +81,13 @@ async function main() {
       processed++;
     }
 
-    // Batch update all rejected articles
-    if (updates.length > 0) {
-      await prisma.article.updateMany({
-        where: { id: { in: updates } },
-        data: { isPositive: false },
+    // Update each article under a row lock, re-checking for an admin decision made since the pre-filter.
+    for (const id of updates) {
+      await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "Article" WHERE id = ${id} FOR UPDATE`;
+        const decided = await tx.labelEvent.findFirst({ where: { articleId: id, source: "admin" }, select: { id: true } });
+        if (decided) return;
+        await tx.article.update({ where: { id }, data: { isPositive: false } });
       });
     }
 
