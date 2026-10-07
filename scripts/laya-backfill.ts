@@ -6,7 +6,8 @@
  */
 import "./load-env";
 import { prisma } from "../src/lib/prisma";
-import { isLayaConfigured, layaShadowEvaluate } from "../src/lib/laya-shadow";
+import { isLayaConfigured } from "../src/lib/laya-shadow";
+import { layaShadowEvaluate } from "../src/lib/laya-shadow-data";
 
 function intArg(name: string, fallback: number): number {
   const i = process.argv.indexOf(`--${name}`);

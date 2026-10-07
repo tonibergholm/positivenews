@@ -51,6 +51,18 @@ describe("runLayaShadow", () => {
   });
   it("treats duplicates as not failed", async () => {
     const r = await runLayaShadow(OPTS, deps({ store: vi.fn().mockResolvedValue("duplicate") }));
-    expect(r.failed).toBe(0);
+    expect(r).toMatchObject({ failed: 0, evaluated: 0, duplicates: 20 });
+  });
+  it("counts a throwing store as failed per row and continues", async () => {
+    let n = 0;
+    const store = vi.fn().mockImplementation(async () => { if (n++ === 0) throw new Error("db down"); return "stored"; });
+    const r = await runLayaShadow(OPTS, deps({ store }));
+    expect(r).toMatchObject({ status: "done", evaluated: 19, failed: 1 });
+  });
+  it("warns once when the response checkpoint differs from health", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await runLayaShadow(OPTS, deps());
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
   });
 });

@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { runPipeline } from "./pipeline";
-import { isLayaConfigured, layaShadowEvaluate } from "./laya-shadow";
+import { isLayaConfigured } from "./laya-shadow";
+import { layaShadowEvaluate } from "./laya-shadow-data";
 
 let started = false;
 
