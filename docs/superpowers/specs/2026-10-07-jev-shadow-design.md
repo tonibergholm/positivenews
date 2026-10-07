@@ -30,7 +30,7 @@ The decision this work supports: replace the Ollama curator, replace the keyword
 ### `src/lib/jev.ts` (new)
 
 - Wraps `@typesafe-ai/sdk` (`TypeSafeClient`, reads `TYPESAFE_API_KEY`).
-- Model pinned to `jev-1.13.0`. The model ID returned in each response is stored, so results stay attributable if the pin changes.
+- Model pinned to `jev-1.13.0` by default. `TYPESAFE_DEFAULT_MODEL` and `TYPESAFE_BASE_URL` (both read natively by the SDK) override the model and endpoint. Any backend that serves the same `/v1/systemone` API, such as a hosted OpenJev, can then be tried with a config change only. The model ID returned in each response is stored, so results stay attributable.
 - `QUESTION_SET = "v1"`. Changing any question, criterion, or the state format requires bumping this value.
 - `buildState(article)`: `{ title, summary }`, with the summary cut to 300 characters to match the keyword classifier. A missing summary is omitted.
 - `QUESTIONS`: the question map (see below).
@@ -63,7 +63,7 @@ The category Nouls are adapted from `SHARED_REJECTION_RULES` and the pass-specif
 - layoffs and labour disputes
 - health scares
 - data breaches and investigations
-- environmental loss and wildlife crime
+- environmental loss and wildlife crime, including hunting or culling of wild animals
 - product marketing disguised as news
 - celebrity gossip and scandal
 - opinion pieces about societal problems
@@ -103,7 +103,7 @@ If `TYPESAFE_API_KEY` is unset, it returns `{ evaluated: 0, failed: 0 }` without
 
 ### `scripts/jev-smoke.ts` (new)
 
-Sends a fixed set of about 10 FI and EN headlines (clear positives, clear negatives, and known tricky cases such as sports triumph vs. transfer) to the live API. It prints each verdict and probability, and stores nothing. Used for manual checks when the question set changes.
+Sends a fixed set of about 10 FI and EN headlines (clear positives, clear negatives, and known tricky cases such as sports triumph vs. transfer, a wolf-hunting story, and an opinion column) to the live API. It prints each verdict and probability, and stores nothing. Used for manual checks when the question set changes.
 
 ---
 
@@ -184,7 +184,7 @@ The cost is about 1.5k input tokens per article (state plus 20 questions) at $0.
 ## Security and privacy
 
 - Only public RSS titles and summaries are sent to TypeSafe.
-- `TYPESAFE_API_KEY` goes in `.env` locally and on the server, and is never committed. CI does not need it.
+- `TYPESAFE_API_KEY` goes in `.env.local` or `.env` locally and in `.env` on the server, and is never committed. New scripts load `.env.local` before `.env`. CI does not need it.
 
 ## Testing
 
