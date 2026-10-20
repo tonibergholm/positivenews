@@ -26,7 +26,8 @@ export async function loadReportRows(max = 5000): Promise<ReportRow[]> {
           rejectionReason: true,
           source: { select: { name: true, language: true } },
           labelEvents: {
-            where: { source: "admin" },
+            where: { source: { in: ["admin", "ollama", "jev", "openai"] } },
+            orderBy: { createdAt: "asc" },
             select: { id: true, source: true, verdict: true, category: true, eligible: true, bucket: true, retractsId: true, createdAt: true },
           },
         },
@@ -36,6 +37,7 @@ export async function loadReportRows(max = 5000): Promise<ReportRow[]> {
 
   return evaluations.map((e) => ({
     articleId: e.article.id,
+    curatorSource: e.article.labelEvents.filter((event) => ["ollama", "jev", "openai"].includes(event.source)).at(-1)?.source,
     title: e.article.title,
     sourceName: e.article.source.name,
     language: e.article.source.language,

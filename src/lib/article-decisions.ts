@@ -47,6 +47,17 @@ export async function recordOllamaResult(
   r: { outcome: OllamaOutcome; reason: string; pass: 1 | 2 },
   model: string,
 ): Promise<"applied" | "recorded_only" | "not_found"> {
+  if (r.outcome !== "judged_keep" && r.outcome !== "judged_reject") return "recorded_only";
+  return recordCuratorResult(articleId, r, model, "ollama");
+}
+
+export async function recordCuratorResult(
+  articleId: string,
+  r: { outcome: OllamaOutcome; reason: string; pass: 1 | 2 },
+  model: string,
+  source: "jev" | "openai" | "ollama",
+): Promise<"applied" | "recorded_only" | "not_found"> {
+  if (r.outcome !== "judged_keep" && r.outcome !== "judged_reject") return "recorded_only";
   return prisma.$transaction(async (tx) => {
     if (!(await lockArticle(tx, articleId))) return "not_found";
     const authority = await loadAuthority(tx, articleId);
@@ -55,7 +66,7 @@ export async function recordOllamaResult(
     await tx.labelEvent.create({
       data: {
         articleId,
-        source: "ollama",
+        source,
         verdict: reject ? "reject" : "keep",
         reason: r.reason,
         pass: r.pass,

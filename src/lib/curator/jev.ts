@@ -1,0 +1,42 @@
+import type { Prisma } from "@prisma/client";
+import { prisma } from "../prisma";
+import { DEFAULT_THRESHOLDS, evaluateArticle, QUESTION_SET } from "../jev";
+import { isFatalJevError, isUniqueViolation, runPool } from "../jev-pool";
+import { timeoutMs } from "./config";
+import type { ArticleInput, CurationResult } from "./types";
+
+function threshold(name: string, defaultValue: number): number {
+  const value = Number(process.env[name] ?? defaultValue);
+  if (!Number.isFinite(value) || value < 0 || value > 1) throw new Error(`Invalid ${name}`);
+  return value;
+}
+
+export function jevKeep(data: { positiveP: number; upliftingP: number }): boolean {
+  return data.positiveP >= threshold("JEV_KEEP_POSITIVE_THRESHOLD", DEFAULT_THRESHOLDS.positiveMin)
+    && data.upliftingP >= threshold("JEV_KEEP_UPLIFTING_THRESHOLD", DEFAULT_THRESHOLDS.upliftingMin);
+}
+
+export async function curateJev(articles: ArticleInput[]): Promise<CurationResult[]> {
+  if (!process.env.TYPESAFE_API_KEY) throw new Error("TYPESAFE_API_KEY is required");
+  const results: CurationResult[] = [];
+  await runPool(articles, 5, async (article) => {
+    try {
+      let data = await prisma.jevEvaluation.findUnique({ where: { articleId_questionSet: { articleId: article.id, questionSet: QUESTION_SET } } });
+      if (!data) {
+        const evaluated = await evaluateArticle(article, { timeout: timeoutMs(), retry: { maxRetries: 0 } });
+        try {
+          data = await prisma.jevEvaluation.create({ data: { ...evaluated, articleId: article.id, questionSet: QUESTION_SET, answers: evaluated.answers as Prisma.InputJsonValue } });
+        } catch (err) {
+          if (!isUniqueViolation(err)) throw err;
+          data = await prisma.jevEvaluation.findUniqueOrThrow({ where: { articleId_questionSet: { articleId: article.id, questionSet: QUESTION_SET } } });
+        }
+      }
+      const keep = jevKeep(data);
+      results.push({ id: article.id, isPositive: keep, reason: `jev: positive=${data.positiveP}, uplifting=${data.upliftingP}`, pass: 2, outcome: keep ? "judged_keep" : "judged_reject", source: "jev", model: data.model });
+    } catch (err) {
+      console.error(`[curator] Jev failed for ${article.id}`, err);
+      throw err;
+    }
+  }, isFatalJevError);
+  return results;
+}

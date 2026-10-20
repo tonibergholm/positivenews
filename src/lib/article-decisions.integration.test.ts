@@ -80,12 +80,11 @@ describe.skipIf(!hasDb)("article-decisions (integration)", () => {
     expect((await prisma.article.findUniqueOrThrow({ where: { id: kept } })).isPositive).toBe(true);
   });
 
-  it("ineligible Ollama outcomes are recorded as keeps with eligible=false", async () => {
+  it("failed Ollama outcomes leave feed state and labels untouched", async () => {
     const id = await article();
-    expect(await d.recordOllamaResult(id, { outcome: "missing_result", reason: "missing result", pass: 2 }, "m")).toBe("applied");
-    const e = await prisma.labelEvent.findFirstOrThrow({ where: { articleId: id } });
-    expect(e).toMatchObject({ source: "ollama", verdict: "keep", eligible: false });
-    expect((await prisma.article.findUniqueOrThrow({ where: { id } })).curatedAt).not.toBeNull();
+    expect(await d.recordOllamaResult(id, { outcome: "missing_result", reason: "missing result", pass: 2 }, "m")).toBe("recorded_only");
+    expect(await prisma.labelEvent.count({ where: { articleId: id } })).toBe(0);
+    expect((await prisma.article.findUniqueOrThrow({ where: { id } })).curatedAt).toBeNull();
   });
 
   // Holds the article row lock, queues two writers behind it in a known order, then releases.

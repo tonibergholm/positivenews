@@ -9,6 +9,7 @@ export type BaselineGroup = "keyword" | "ollama_reject" | "ollama_keep" | "pendi
 
 export interface ReportRow {
   articleId: string;
+  curatorSource?: string;
   title: string;
   sourceName: string;
   language: string;
@@ -53,8 +54,9 @@ export interface JevReport {
   disagreements: Disagreement[];
 }
 
-export function baselineGroup(r: Pick<ReportRow, "rejectionPass" | "curatedAt" | "adminDecided">): BaselineGroup {
+export function baselineGroup(r: Pick<ReportRow, "rejectionPass" | "curatedAt" | "adminDecided" | "curatorSource">): BaselineGroup {
   if (r.adminDecided) return "admin";
+  if (r.curatorSource && r.curatorSource !== "ollama") return "pending";
   if (r.rejectionPass === 0) return "keyword";
   if (r.rejectionPass === 1 || r.rejectionPass === 2) return "ollama_reject";
   if (r.curatedAt) return "ollama_keep";

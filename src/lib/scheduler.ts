@@ -23,7 +23,7 @@ export function startScheduler(): void {
   let layaRunning = false;
   cron.schedule("7,22,37,52 * * * *", async () => {
     if (!isLayaConfigured() || layaRunning) return;
-    // Don't compete with the pipeline (Ollama + DB) for the small server.
+    // Don't compete with the pipeline (curation + DB) for the small server.
     if (isPipelineRunning()) return;
     layaRunning = true;
     try {

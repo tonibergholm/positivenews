@@ -1,6 +1,7 @@
 import { curateUnchecked } from "./curate";
 import { ingestAll } from "./ingest";
 import { deactivateStaleKeywords, activatePendingKeywords } from "./keywords-maintenance";
+import { curatorConfig } from "./curator/config";
 import { shadowEvaluate } from "./jev-shadow";
 
 const JEV_SHADOW_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
@@ -30,10 +31,9 @@ export async function runPipeline(): Promise<PipelineResult> {
     const ingestResult = await ingestAll();
     const curationResult = await curateUnchecked();
 
-    // Shadow mode: Jev results are stored for comparison only and must never
-    // affect ingest or curation.
+    // Keep comparison evaluations separate when Jev is not the primary curator.
     try {
-      await shadowEvaluate({
+      if (curatorConfig().primary !== "jev") await shadowEvaluate({
         since: new Date(Date.now() - JEV_SHADOW_WINDOW_MS),
         limit: JEV_SHADOW_LIMIT,
         budgetMs: JEV_SHADOW_BUDGET_MS,
