@@ -6,6 +6,7 @@ import { GET as stats } from "../../app/api/stats/route";
 import { GET as stream } from "../../app/api/stats/stream/route";
 
 vi.mock("./prisma", () => ({ prisma: {
+  $transaction: vi.fn(),
   article: { findMany: vi.fn(), count: vi.fn(), groupBy: vi.fn(), aggregate: vi.fn() },
   source: { findMany: vi.fn() },
 } }));
@@ -26,6 +27,7 @@ it.each(["json", "stream"])("counts only approved positives in %s stats", async 
   vi.mocked(prisma.article.groupBy).mockResolvedValue([]);
   vi.mocked(prisma.article.aggregate).mockResolvedValue({ _min: {}, _max: {} } as never);
   vi.mocked(prisma.source.findMany).mockResolvedValue([]);
+  vi.mocked(prisma.$transaction).mockImplementation((async (queries: Promise<unknown>[]) => Promise.all(queries)) as never);
   if (kind === "json") await stats();
   else {
     const controller = new AbortController();
@@ -33,6 +35,7 @@ it.each(["json", "stream"])("counts only approved positives in %s stats", async 
     await response.body!.getReader().read();
     controller.abort();
   }
+  expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Array), { isolationLevel: "RepeatableRead" });
   const where = { isPositive: true, curatedAt: { not: null } };
   expect(prisma.article.count).toHaveBeenCalledWith({ where });
   expect(prisma.article.groupBy).toHaveBeenCalledWith(expect.objectContaining({ by: ["sourceId"], where }));
@@ -52,6 +55,7 @@ it.each(["json", "stream"])("excludes pending articles from %s rejection rates",
   vi.mocked(prisma.article.aggregate).mockResolvedValue({ _min: {}, _max: {} } as never);
   vi.mocked(prisma.source.findMany).mockResolvedValue([{ id: "s", name: "S" }] as never);
   let body;
+  vi.mocked(prisma.$transaction).mockImplementation((async (queries: Promise<unknown>[]) => Promise.all(queries)) as never);
   if (kind === "json") body = await (await stats()).json();
   else {
     const controller = new AbortController();

@@ -85,3 +85,50 @@ it("rejects an invalid threshold before any paid evaluation", async () => {
   await expect(curateJev([article, { ...article, id: "b" }])).rejects.toThrow("Invalid JEV_KEEP_POSITIVE_THRESHOLD");
   expect(evaluateArticle).not.toHaveBeenCalled();
 });
+
+it.each([new APIConnectionError(), new APITimeoutError(100), new APIError(503, {}, new Headers())])("preserves the breaker across cache hits and leaves fallback budget: %s", async (error) => {
+  vi.useFakeTimers();
+  vi.stubEnv("TYPESAFE_API_KEY", "test");
+  vi.stubEnv("CURATOR_BUDGET_MS", "10000");
+  const start = Date.now();
+  const articles = Array.from({ length: 100 }, (_, i) => ({ ...article, id: `${i % 2 ? "cached" : "live"}-${i}` }));
+  vi.mocked(prisma.jevEvaluation.findUnique).mockImplementation((async (args: { where: { articleId_questionSet: { articleId: string } } }) => {
+    if (!args.where.articleId_questionSet.articleId.startsWith("cached")) return null;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    return data;
+  }) as never);
+  let calls = 0;
+  vi.mocked(evaluateArticle).mockImplementation(async () => {
+    await new Promise((resolve) => setTimeout(resolve, ++calls * 100));
+    throw error;
+  });
+  const run = curateJev(articles);
+  await vi.runAllTimersAsync();
+  const results = await run;
+  expect(vi.mocked(evaluateArticle).mock.calls.length).toBeLessThanOrEqual(6);
+  expect(results.length).toBeGreaterThan(0);
+  expect(results.every((result) => result.id.startsWith("cached") && result.isPositive)).toBe(true);
+  expect(Date.now() - start).toBeLessThan(1000);
+});
+
+it("resets availability failures after a successful live evaluation", async () => {
+  vi.useFakeTimers();
+  vi.stubEnv("TYPESAFE_API_KEY", "test");
+  const articles = Array.from({ length: 8 }, (_, i) => ({ ...article, id: String(i), title: String(i) }));
+  vi.mocked(prisma.jevEvaluation.findUnique).mockImplementation((async (args: { where: { articleId_questionSet: { articleId: string } } }) => {
+    if (Number(args.where.articleId_questionSet.articleId) < 3) return null;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    return data;
+  }) as never);
+  vi.mocked(prisma.jevEvaluation.create).mockResolvedValue(data as never);
+  vi.mocked(evaluateArticle).mockImplementation(async (input) => {
+    const index = Number(input.title);
+    await new Promise((resolve) => setTimeout(resolve, (index + 1) * 10));
+    if (index !== 1) throw new APIConnectionError();
+    return data;
+  });
+  const run = curateJev(articles);
+  await vi.runAllTimersAsync();
+  expect(await run).toHaveLength(6);
+  expect(prisma.jevEvaluation.findUnique).toHaveBeenCalledTimes(8);
+});
