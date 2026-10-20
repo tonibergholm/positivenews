@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/src/lib/prisma";
 import { recordAdminDecision, retractAdminDecision } from "@/src/lib/article-decisions";
 import { CATEGORIES, deriveVerdict, QUESTION_SET } from "@/src/lib/jev";
+import { jevThresholds } from "@/src/lib/curator/jev";
 import { REVIEW_BUCKETS, type ReviewBucket } from "@/src/lib/labels";
 
 export interface Reveal {
@@ -41,7 +42,7 @@ async function loadReveal(articleId: string): Promise<Reveal> {
     openai: events.find((e) => e.source === "openai")?.verdict ?? null,
     keyword: events.some((e) => e.source === "keyword"),
     jev: jev
-      ? { keep: liveJev ? liveJev === "keep" : deriveVerdict(jev).keep, positiveP: jev.positiveP, upliftingP: jev.upliftingP, topCategory: CATEGORIES[jev.topCategory]?.label ?? jev.topCategory }
+      ? { keep: liveJev ? liveJev === "keep" : deriveVerdict(jev, jevThresholds()).keep, positiveP: jev.positiveP, upliftingP: jev.upliftingP, topCategory: CATEGORIES[jev.topCategory]?.label ?? jev.topCategory }
       : null,
   };
 }
