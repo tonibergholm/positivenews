@@ -150,3 +150,19 @@ it("treats empty or whitespace Ollama and OpenAI model/URL overrides as unset", 
   expect(openai.mock.calls[0][0]).toBe("https://api.mistral.ai/v1/chat/completions");
   expect(JSON.parse(openai.mock.calls[0][1].body).model).toBe("ministral-8b-2512");
 });
+
+it("stops scheduling batches after two consecutive failures so fallback keeps budget", async () => {
+  const call = vi.fn().mockRejectedValue(new Error("timeout"));
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const articles = Array.from({ length: 50 }, (_, i) => ({ ...article, id: String(i) }));
+  expect(await twoPass(articles, call, "openai", "test")).toEqual([]);
+  expect(call).toHaveBeenCalledTimes(2);
+});
+it("resets the failure count after a successful batch", async () => {
+  const ok = { results: [{ id: "x", positive: false, reason: "negative" }] };
+  const call = vi.fn().mockRejectedValueOnce(new Error("x")).mockResolvedValueOnce(ok).mockRejectedValueOnce(new Error("x")).mockResolvedValue(ok);
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const articles = Array.from({ length: 40 }, (_, i) => ({ ...article, id: String(i) }));
+  await twoPass(articles, call, "openai", "test");
+  expect(call).toHaveBeenCalledTimes(4);
+});

@@ -24,6 +24,7 @@ export async function loadCandidates(now = new Date()): Promise<QueueCandidate[]
       id: true,
       createdAt: true,
       isPositive: true,
+      curatedAt: true,
       flaggedAt: true,
       labelEvents: { where: { source: { in: ["admin", "reader_flag"] } }, select: ADMIN_EVENT_SELECT },
       jevEvaluations: { where: { questionSet: QUESTION_SET }, select: { positiveP: true, upliftingP: true, topCategoryP: true }, take: 1 },
@@ -36,7 +37,7 @@ export async function loadCandidates(now = new Date()): Promise<QueueCandidate[]
       articleId: r.id,
       createdAt: r.createdAt,
       flagged: Boolean(r.flaggedAt) || r.labelEvents.some((e) => e.source === "reader_flag"),
-      inFeed: r.isPositive,
+      inFeed: r.isPositive && r.curatedAt != null,
       cohort: isTestCohort(r.id),
       jev: r.jevEvaluations[0] ?? null,
     }));

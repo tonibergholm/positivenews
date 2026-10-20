@@ -195,7 +195,7 @@ export function ReviewCardView({ card, categories, skip, more, redecide }: Props
       >
         {reveal && (
           <>
-            Ollama: {reveal.ollama ?? "—"} · Keyword: {reveal.keyword ? "reject" : "—"} · Jev:{" "}
+            Ollama: {reveal.ollama ?? "—"} · OpenAI: {reveal.openai ?? "—"} · Keyword: {reveal.keyword ? "reject" : "—"} · Jev:{" "}
             {reveal.jev ? `${reveal.jev.keep ? "keep" : "reject"} (pos ${reveal.jev.positiveP.toFixed(2)}, upl ${reveal.jev.upliftingP.toFixed(2)}, ${reveal.jev.topCategory})` : "—"}
           </>
         )}

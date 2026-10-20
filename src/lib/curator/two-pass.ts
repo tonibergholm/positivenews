@@ -14,6 +14,8 @@ function verdicts(value: unknown, field: string): Map<string, { keep: boolean; r
   return results;
 }
 
+const MAX_CONSECUTIVE_FAILURES = 2;
+
 export async function twoPass(
   articles: ArticleInput[],
   call: (prompt: string) => Promise<unknown>,
@@ -22,11 +24,14 @@ export async function twoPass(
   deadline = Infinity,
 ): Promise<CurationResult[]> {
   const results: CurationResult[] = [];
+  // Stop after repeated failures so a stalled endpoint leaves budget for the fallback provider.
+  let failures = 0;
   for (let i = 0; i < articles.length; i += 10) {
-    if (Date.now() >= deadline) break;
+    if (Date.now() >= deadline || failures >= MAX_CONSECUTIVE_FAILURES) break;
     const batch = articles.slice(i, i + 10);
     try {
       const first = verdicts(await call(buildPass1Prompt(batch)), "positive");
+      failures = 0;
       const positives: ArticleInput[] = [];
       for (const article of batch) {
         const r = first.get(article.id);
@@ -42,6 +47,7 @@ export async function twoPass(
         if (r) results.push({ id: article.id, isPositive: r.keep, reason: r.reason, pass: 2, outcome: r.keep ? "judged_keep" : "judged_reject", source, model });
       }
     } catch (err) {
+      failures++;
       console.error(`[curator] ${source} batch failed; undecided articles need fallback or retry`, err);
     }
   }

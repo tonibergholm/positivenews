@@ -37,3 +37,29 @@ it.each(["json", "stream"])("counts only approved positives in %s stats", async 
   expect(prisma.article.count).toHaveBeenCalledWith({ where });
   expect(prisma.article.groupBy).toHaveBeenCalledWith(expect.objectContaining({ by: ["sourceId"], where }));
 });
+
+it.each(["json", "stream"])("excludes pending articles from %s rejection rates", async (kind) => {
+  // total 10, approved 3, pending 5 -> 2 rejected of 5 decided
+  vi.mocked(prisma.article.count).mockImplementation((async (args?: { where?: { curatedAt?: unknown; isPositive?: boolean } }) => {
+    if (!args?.where) return 10;
+    return args.where.curatedAt === null ? 5 : 3;
+  }) as never);
+  vi.mocked(prisma.article.groupBy).mockImplementation((async (args: { by: string[]; where?: { curatedAt?: unknown } }) => {
+    if (args.by[0] !== "sourceId") return [];
+    if (!args.where) return [{ sourceId: "s", _count: { id: 10 }, _max: { publishedAt: null } }];
+    return [{ sourceId: "s", _count: { id: args.where.curatedAt === null ? 5 : 3 } }];
+  }) as never);
+  vi.mocked(prisma.article.aggregate).mockResolvedValue({ _min: {}, _max: {} } as never);
+  vi.mocked(prisma.source.findMany).mockResolvedValue([{ id: "s", name: "S" }] as never);
+  let body;
+  if (kind === "json") body = await (await stats()).json();
+  else {
+    const controller = new AbortController();
+    const response = await stream(new NextRequest("http://localhost/news/api/stats/stream", { signal: controller.signal }));
+    const { value } = await response.body!.getReader().read();
+    controller.abort();
+    body = JSON.parse(new TextDecoder().decode(value).replace(/^data: /, ""));
+  }
+  expect(body.articles.rejectionRate).toBe(0.4);
+  expect(body.bySources[0].rejectionRate).toBe(40);
+});
