@@ -4,7 +4,7 @@ import type { ArticleInput } from "./types";
 
 export async function curateOllama(articles: ArticleInput[], deadline = Date.now() + budgetMs()) {
   const base = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
-  const model = process.env.OLLAMA_MODEL ?? "gemma3:4b";
+  const model = process.env.OLLAMA_MODEL?.trim() || "gemma3:4b";
   return twoPass(articles, async (prompt) => {
     const response = await fetch(`${base.replace(/\/+$/, "")}/api/generate`, {
       method: "POST", headers: { "Content-Type": "application/json" },

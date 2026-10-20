@@ -135,3 +135,18 @@ it("respects explicit Ollama URL and production model overrides", async () => {
   expect(fetch.mock.calls[0][0]).toBe("http://ollama.test/api/generate");
   expect(JSON.parse(fetch.mock.calls[0][1].body).model).toBe("llama3.2:1b");
 });
+
+it("treats empty or whitespace Ollama and OpenAI model/URL overrides as unset", async () => {
+  vi.stubEnv("OLLAMA_MODEL", "  ");
+  const ollama = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ response: JSON.stringify({ results: [{ id: "a", positive: false, reason: "negative" }] }) }) });
+  vi.stubGlobal("fetch", ollama);
+  await curateOllama([article]);
+  expect(JSON.parse(ollama.mock.calls[0][1].body).model).toBe("gemma3:4b");
+  vi.stubEnv("CURATOR_OPENAI_BASE_URL", "");
+  vi.stubEnv("CURATOR_OPENAI_MODEL", " ");
+  const openai = vi.fn().mockResolvedValue(reply([{ id: "a", positive: false, reason: "negative" }]));
+  vi.stubGlobal("fetch", openai);
+  await curateOpenAI([article]);
+  expect(openai.mock.calls[0][0]).toBe("https://api.mistral.ai/v1/chat/completions");
+  expect(JSON.parse(openai.mock.calls[0][1].body).model).toBe("ministral-8b-2512");
+});
