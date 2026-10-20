@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../prisma";
-import { DEFAULT_THRESHOLDS, evaluateArticle, QUESTION_SET } from "../jev";
+import { DEFAULT_THRESHOLDS, deriveVerdict, evaluateArticle, QUESTION_SET, type JevThresholds } from "../jev";
 import { isFatalJevError, isUniqueViolation, runPool } from "../jev-pool";
 import { timeoutMs } from "./config";
 import type { ArticleInput, CurationResult } from "./types";
@@ -11,9 +11,21 @@ function threshold(name: string, defaultValue: number): number {
   return value;
 }
 
-export function jevKeep(data: { positiveP: number; upliftingP: number }): boolean {
-  return data.positiveP >= threshold("JEV_KEEP_POSITIVE_THRESHOLD", DEFAULT_THRESHOLDS.positiveMin)
-    && data.upliftingP >= threshold("JEV_KEEP_UPLIFTING_THRESHOLD", DEFAULT_THRESHOLDS.upliftingMin);
+export function jevThresholds(): JevThresholds {
+  return {
+    positiveMin: threshold("JEV_KEEP_POSITIVE_THRESHOLD", DEFAULT_THRESHOLDS.positiveMin),
+    upliftingMin: threshold("JEV_KEEP_UPLIFTING_THRESHOLD", DEFAULT_THRESHOLDS.upliftingMin),
+    categoryMax: threshold("JEV_CATEGORY_VETO_THRESHOLD", DEFAULT_THRESHOLDS.categoryMax),
+  };
+}
+
+/** Same rule as the admin Jev report (deriveVerdict), with env-overridable thresholds. */
+export function jevDecision(data: { positiveP: number; upliftingP: number; topCategory: string; topCategoryP: number }) {
+  return deriveVerdict(data, jevThresholds());
+}
+
+export function jevKeep(data: { positiveP: number; upliftingP: number; topCategory: string; topCategoryP: number }): boolean {
+  return jevDecision(data).keep;
 }
 
 export async function curateJev(articles: ArticleInput[]): Promise<CurationResult[]> {
@@ -31,8 +43,10 @@ export async function curateJev(articles: ArticleInput[]): Promise<CurationResul
           data = await prisma.jevEvaluation.findUniqueOrThrow({ where: { articleId_questionSet: { articleId: article.id, questionSet: QUESTION_SET } } });
         }
       }
-      const keep = jevKeep(data);
-      results.push({ id: article.id, isPositive: keep, reason: `jev: positive=${data.positiveP}, uplifting=${data.upliftingP}`, pass: 2, outcome: keep ? "judged_keep" : "judged_reject", source: "jev", model: data.model });
+      const verdict = jevDecision(data);
+      const keep = verdict.keep;
+      const reason = `${verdict.reason ?? "jev: keep"} (positive=${data.positiveP.toFixed(2)}, uplifting=${data.upliftingP.toFixed(2)}, ${data.topCategory}=${data.topCategoryP.toFixed(2)})`;
+      results.push({ id: article.id, isPositive: keep, reason, pass: 2, outcome: keep ? "judged_keep" : "judged_reject", source: "jev", model: data.model });
     } catch (err) {
       console.error(`[curator] Jev failed for ${article.id}`, err);
       throw err;

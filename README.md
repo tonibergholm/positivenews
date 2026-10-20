@@ -318,14 +318,15 @@ MIT
 ## Curator providers
 
 `CURATOR_PROVIDER` selects `jev`, `openai`, `ollama`, or `none`. When unset,
-it selects Jev if `TYPESAFE_API_KEY` exists, otherwise Ollama if `OLLAMA_URL`
-exists, otherwise none. `none` disables automated decisions for untrusted
+it selects Ollama if `OLLAMA_URL` exists, otherwise Jev if `TYPESAFE_API_KEY`
+exists, otherwise none. Existing deployments (Ollama plus a Jev shadow key) keep
+Ollama until `CURATOR_PROVIDER` is set explicitly. `none` disables automated decisions for untrusted
 articles. Trusted sources still receive automatic approval.
 
-Jev keeps an article iff both `positiveP >= JEV_KEEP_POSITIVE_THRESHOLD`
-and `upliftingP >= JEV_KEEP_UPLIFTING_THRESHOLD`. Both default to 0.5, matching
-the existing report probability thresholds. Primary decisions do not apply the
-report's extra category veto. Evaluations are stored before decisions and reused
+Jev keeps an article with the same rule as the admin Jev report
+(`deriveVerdict` in `src/lib/jev.ts`): `positiveP >= JEV_KEEP_POSITIVE_THRESHOLD`
+(default 0.5), `upliftingP >= JEV_KEEP_UPLIFTING_THRESHOLD` (default 0.5) and
+`topCategoryP <= JEV_CATEGORY_VETO_THRESHOLD` (default 0.6). Evaluations are stored before decisions and reused
 on retry. The primary Jev provider replaces its shadow pipeline step.
 
 `CURATOR_FALLBACK` accepts `openai`, `ollama`, or `none` and defaults to `none`.
@@ -350,13 +351,11 @@ Set `OLLAMA_URL` and optionally `OLLAMA_MODEL`, which defaults to `llama3.2:1b`.
 `CURATOR_TIMEOUT_MS` defaults to 30000 per request for all providers.
 Laya remains an independent shadow job, skipped when `LAYA_URL` is unset.
 
-For rollout, explicitly retain your current provider while Jev runs in shadow,
-compare results on the scoreboard, tune the two probability thresholds, then
-switch to `CURATOR_PROVIDER=jev`. The scoreboard uses its fixed default thresholds and category veto; primary
-threshold overrides do not change that comparison verdict. Account for both
-differences when tuning. Existing
-installations with a TypeSafe key select Jev automatically unless they pin the
-provider. Keep API keys in deployment secrets, never in version control.
+For rollout: keep the default (Ollama stays primary, Jev keeps running in shadow),
+compare results at `/news/admin/jev` and on the scoreboard, tune the three Jev
+thresholds, then set `CURATOR_PROVIDER=jev` (optionally `CURATOR_FALLBACK=openai`)
+and remove `OLLAMA_URL`. The admin report uses the default thresholds; overrides
+only affect live decisions. Keep API keys in deployment secrets, never in version control.
 
 Jev and OpenAI label events retain their provider source. Existing weak-label
 training exports consume Ollama verdicts only, so these new providers do not
