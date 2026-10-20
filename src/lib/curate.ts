@@ -2,16 +2,14 @@
  * Post-ingest curation job.
  *
  * Finds articles that passed the keyword pre-filter but haven't been
- * LLM-curated yet, and runs them through the two-tier Ollama curator.
+ * LLM-curated yet, and runs them through the configured curator.
  * Trusted-source articles are auto-approved without LLM.
  */
 
 import { prisma } from "./prisma";
-import { curateArticles } from "./llm-curator";
-import { recordOllamaResult } from "./article-decisions";
+import { curateArticles } from "./curator";
+import { recordCuratorResult } from "./article-decisions";
 import { FEED_SOURCES } from "@/src/config/sources";
-
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "gemma3:4b";
 
 const trustedSourceUrls = new Set(
   FEED_SOURCES.filter((s) => s.trusted).map((s) => s.url)
@@ -76,11 +74,12 @@ export async function curateUnchecked(): Promise<{
 
   let rejected = 0;
   let approved = 0;
+  let skipped = needsCuration.length - results.length;
 
   for (const r of results) {
     try {
-      const status = await recordOllamaResult(r.id, { outcome: r.outcome, reason: r.reason, pass: r.pass }, OLLAMA_MODEL);
-      if (status !== "applied") continue;
+      const status = await recordCuratorResult(r.id, { outcome: r.outcome, reason: r.reason, pass: r.pass }, r.model, r.source);
+      if (status !== "applied") { skipped++; continue; }
       if (r.isPositive) {
         approved++;
       } else {
@@ -88,6 +87,7 @@ export async function curateUnchecked(): Promise<{
         console.log(`[curate] Rejected: "${needsCuration.find((a) => a.id === r.id)?.title}" — ${r.reason} (pass ${r.pass})`);
       }
     } catch (err) {
+      skipped++;
       console.error(`[curate] Failed to record result for ${r.id}:`, err);
     }
   }
@@ -97,5 +97,5 @@ export async function curateUnchecked(): Promise<{
     `[curate] Done — ${curated} approved, ${rejected} rejected, ${trusted.length} auto-trusted`
   );
 
-  return { curated, rejected, skipped: trusted.length };
+  return { curated, rejected, skipped };
 }

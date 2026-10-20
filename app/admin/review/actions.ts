@@ -5,10 +5,12 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/src/lib/prisma";
 import { recordAdminDecision, retractAdminDecision } from "@/src/lib/article-decisions";
 import { CATEGORIES, deriveVerdict, QUESTION_SET } from "@/src/lib/jev";
+import { jevThresholds } from "@/src/lib/curator/jev";
 import { REVIEW_BUCKETS, type ReviewBucket } from "@/src/lib/labels";
 
 export interface Reveal {
   ollama: string | null;  // "keep" | "reject" | null
+  openai: string | null;
   keyword: boolean;
   jev: { keep: boolean; positiveP: number; upliftingP: number; topCategory: string } | null;
 }
@@ -27,17 +29,20 @@ async function actor(): Promise<string | null> {
 async function loadReveal(articleId: string): Promise<Reveal> {
   const [events, jev] = await Promise.all([
     prisma.labelEvent.findMany({
-      where: { articleId, source: { in: ["ollama", "keyword"] }, eligible: true },
+      where: { articleId, source: { in: ["ollama", "openai", "jev", "keyword"] }, eligible: true },
       orderBy: { createdAt: "desc" },
       select: { source: true, verdict: true },
     }),
     prisma.jevEvaluation.findFirst({ where: { articleId, questionSet: QUESTION_SET } }),
   ]);
+  // Prefer the verdict the live curator recorded; thresholds may have been overridden by env.
+  const liveJev = events.find((e) => e.source === "jev")?.verdict ?? null;
   return {
     ollama: events.find((e) => e.source === "ollama")?.verdict ?? null,
+    openai: events.find((e) => e.source === "openai")?.verdict ?? null,
     keyword: events.some((e) => e.source === "keyword"),
     jev: jev
-      ? { keep: deriveVerdict(jev).keep, positiveP: jev.positiveP, upliftingP: jev.upliftingP, topCategory: CATEGORIES[jev.topCategory]?.label ?? jev.topCategory }
+      ? { keep: liveJev ? liveJev === "keep" : deriveVerdict(jev, jevThresholds()).keep, positiveP: jev.positiveP, upliftingP: jev.upliftingP, topCategory: CATEGORIES[jev.topCategory]?.label ?? jev.topCategory }
       : null,
   };
 }
@@ -57,7 +62,7 @@ export async function decideAction(articleId: string, verdict: "keep" | "reject"
       reveal = await loadReveal(articleId);
     } catch (err) {
       console.error("[review] reveal failed:", err);
-      reveal = { ollama: null, keyword: false, jev: null };
+      reveal = { ollama: null, openai: null, keyword: false, jev: null };
     }
     return { ok: true as const, eventId: r.eventId, reveal };
   } catch (err) {

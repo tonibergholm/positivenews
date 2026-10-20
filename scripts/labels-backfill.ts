@@ -5,6 +5,7 @@
  * Usage: pnpm labels:backfill [--before 2026-10-08T00:00:00Z]
  */
 import "./load-env";
+import { CURATOR_LABEL_SOURCES } from "../src/lib/labels";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../src/lib/prisma";
 import { FEED_SOURCES } from "../src/config/sources";
@@ -90,11 +91,11 @@ async function main() {
         if (live.has("keyword")) counts.excludedLive++;
         else rows.push({ kind: "keyword", data: { source: "keyword", verdict: "reject", reason: hist.rejectionReason, createdAt: a.createdAt } });
       } else if (hist.rejectionPass === 1 || hist.rejectionPass === 2) {
-        if (live.has("ollama")) counts.excludedLive++;
+        if (CURATOR_LABEL_SOURCES.some((source) => live.has(source))) counts.excludedLive++;
         else rows.push({ kind: "ollama", data: { source: "ollama", verdict: "reject", reason: hist.rejectionReason, pass: hist.rejectionPass, createdAt: hist.curatedAt ?? a.createdAt } });
       } else if (hist.curatedAt && hist.rejectionPass === null && !trusted.has(a.source.url)) {
         // An admin keep also sets curatedAt with no rejection; it must not become a made-up Ollama event.
-        if (live.has("ollama") || (!adminPrev && live.has("admin"))) counts.excludedLive++;
+        if (CURATOR_LABEL_SOURCES.some((source) => live.has(source)) || (!adminPrev && live.has("admin"))) counts.excludedLive++;
         else rows.push({ kind: "ollama", data: { source: "ollama", verdict: "keep", reason: "historical approval (unverified)", pass: 2, eligible: false, createdAt: hist.curatedAt } });
       }
       if (a.flaggedAt) {

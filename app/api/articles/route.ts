@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
 
   const where = {
     isPositive: true,
+    curatedAt: { not: null },
     publishedAt: { gte: since },
     ...(category && category !== "All" ? { category } : {}),
     ...(sourceId ? { sourceId } : {}),

@@ -30,8 +30,7 @@ export async function runPipeline(): Promise<PipelineResult> {
     const ingestResult = await ingestAll();
     const curationResult = await curateUnchecked();
 
-    // Shadow mode: Jev results are stored for comparison only and must never
-    // affect ingest or curation.
+    // Evaluate articles the primary missed, including keyword rejections. Existing evaluations are skipped.
     try {
       await shadowEvaluate({
         since: new Date(Date.now() - JEV_SHADOW_WINDOW_MS),

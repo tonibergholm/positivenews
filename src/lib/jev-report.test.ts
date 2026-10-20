@@ -129,3 +129,9 @@ describe("buildReport", () => {
     expect(buildReport(rows).models).toEqual(["jev-1.13.0", "jev-1.14.0"]);
   });
 });
+
+
+it("does not attribute Jev or OpenAI decisions to Ollama", () => {
+  expect(baselineGroup({ rejectionPass: 2, curatedAt: new Date(), adminDecided: false, curatorSource: "jev" })).toBe("pending");
+  expect(baselineGroup({ rejectionPass: null, curatedAt: new Date(), adminDecided: false, curatorSource: "openai" })).toBe("pending");
+});

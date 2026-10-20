@@ -13,7 +13,7 @@ RSS Feeds (25 sources, every 15 min)
 Keyword pre-filter (instant) ──► Negative? ──► Rejected
     │
     ▼
-LLM Pass 1: Positive/negative classification (gemma3:4b via Ollama)
+LLM Pass 1: Positive/negative classification (configured provider)
     │                                              │
     │                                              ▼
     │                                         Negative? ──► Rejected
@@ -46,12 +46,12 @@ Fast, deterministic keyword matching runs during RSS ingestion:
 
 #### Tier 2: LLM positive/negative classification (post-ingest)
 
-After ingestion, articles that passed keywords go through `gemma3:4b` via local Ollama:
+With OpenAI or Ollama selected, articles that passed keywords go through two passes:
 
 - Inclusion criteria: solutions journalism, scientific breakthroughs, acts of kindness, environmental recovery, cultural/sports triumphs, Finnish "sisu" stories, practical wellness
 - Exclusion criteria: war, geopolitics, crime, alarmist headlines, opinion columns, sports non-triumphs, rising costs, filler content, health alarm stories, cancelled events, tech platform problems
 - Batched (10 articles per LLM call), temperature 0.1 for consistency
-- Fail-open: if Ollama is unavailable, articles are kept
+- Failed calls try the configured fallback, then leave articles uncurated for retry
 
 #### Tier 3: LLM strict quality filter
 
@@ -77,7 +77,7 @@ When a user flags an article via the X button on the card:
 
 - **Framework:** Next.js 16 with App Router
 - **Database:** PostgreSQL with Prisma 7 (driver adapter: `@prisma/adapter-pg`)
-- **LLM:** Ollama with gemma3:4b (local, CPU inference)
+- **Curator:** TypeSafe Jev, OpenAI-compatible APIs, or optional local Ollama
 - **Styling:** Tailwind CSS 4, shadcn components
 - **Typography:** Fraunces (serif headlines), DM Sans (body)
 - **RSS parsing:** rss-parser
@@ -129,7 +129,7 @@ To add a source, edit `src/config/sources.ts`.
 - Node.js 22+
 - pnpm
 - PostgreSQL
-- Ollama with `gemma3:4b` model
+- Optional Ollama with the `gemma3:4b` model (the default; or set `OLLAMA_MODEL`)
 
 ### Install
 
@@ -137,6 +137,7 @@ To add a source, edit `src/config/sources.ts`.
 git clone https://github.com/tonibergholm/positivenews.git
 cd positivenews
 pnpm install
+# Only if using Ollama:
 ollama pull gemma3:4b
 ```
 
@@ -177,7 +178,7 @@ The feed scheduler starts automatically on server boot via the Next.js instrumen
 
 ### Jev shadow evaluation (optional)
 
-With `TYPESAFE_API_KEY` set, every pipeline run also evaluates recent non-trusted articles with [TypeSafe Jev](https://docs.typesafe.ai) and stores the answers in `JevEvaluation`. Jev does not change what the feed shows. Compare it with the Ollama curator at `/news/admin/jev`.
+With `TYPESAFE_API_KEY` set, every pipeline run also evaluates recent non-trusted articles with [TypeSafe Jev](https://docs.typesafe.ai) and stores the answers in `JevEvaluation`. When another provider is selected, Jev runs in shadow and does not change the feed. With Jev selected as primary, its probabilities decide the feed. Compare it with the Ollama curator at `/news/admin/jev`.
 
 Migrations run automatically during deploy (`prisma migrate deploy`).
 
@@ -313,3 +314,61 @@ LearnedKeyword
 ## License
 
 MIT
+
+## Curator providers
+
+`CURATOR_PROVIDER` selects `jev`, `openai`, `ollama`, or `none`. When unset or
+empty, it always selects Ollama, regardless of available API keys. For upgrades
+from the legacy Ollama curator, provider selection does not change unless
+`CURATOR_PROVIDER` is set. Jev and OpenAI-compatible
+primaries require an explicit selection. `none` disables automated decisions for
+untrusted articles. Trusted sources still receive automatic approval. Articles
+appear in the public feed only after approval, with `isPositive = true` and a
+non-null `curatedAt`.
+
+Jev keeps an article with the same rule as the admin Jev report
+(`deriveVerdict` in `src/lib/jev.ts`): `positiveP >= JEV_KEEP_POSITIVE_THRESHOLD`
+(default 0.5), `upliftingP >= JEV_KEEP_UPLIFTING_THRESHOLD` (default 0.5) and
+`topCategoryP <= JEV_CATEGORY_VETO_THRESHOLD` (default 0.6). Evaluations are stored before decisions and reused
+on retry. Shadow evaluation still runs when Jev is primary to cover articles the
+primary never sees, including keyword rejections. It skips existing evaluations.
+
+`CURATOR_FALLBACK` accepts `openai`, `ollama`, or `none` and defaults to `none`.
+Only articles without valid decisions go to fallback. Failed requests, invalid
+verdicts, and timeouts never approve articles. If neither provider decides,
+`curatedAt` stays null and no keep/reject label is recorded. The next run retries.
+There is currently no retry count or age limit, so permanently failing articles
+can retry indefinitely and occupy the 50-article run limit. Monitor skipped logs;
+add a persisted retry limit if these failures accumulate.
+
+OpenAI-compatible requests use `CURATOR_OPENAI_API_KEY`,
+`CURATOR_OPENAI_BASE_URL`, and `CURATOR_OPENAI_MODEL`. Defaults are Mistral at
+`https://api.mistral.ai/v1` with `ministral-8b-2512`, Ministral 3 8B.
+For Gemini 2.5 Flash-Lite, set the base to
+`https://generativelanguage.googleapis.com/v1beta/openai` and model to
+`gemini-2.5-flash-lite`. Scaleway Generative APIs offers an EU option at
+`https://api.scaleway.ai/v1`; select a model available there. All use the same
+two-pass prompts, JSON output, and temperature 0.1.
+
+Ollama is optional and is contacted only when selected as primary or fallback.
+`OLLAMA_URL` defaults to `http://127.0.0.1:11434` and `OLLAMA_MODEL` defaults to
+`gemma3:4b`. Production explicitly sets `OLLAMA_MODEL=llama3.2:1b`.
+`CURATOR_TIMEOUT_MS` defaults to 30000 per request for all providers.
+`CURATOR_BUDGET_MS` defaults to 120000 for the entire curation run. Primary and
+fallback share that budget; fallback receives only the remaining time. Requests
+are capped at the remaining budget, and no new articles or batches start after
+the deadline. Two consecutive Jev availability failures, including timeouts,
+network errors or HTTP 5xx responses, stop its pool and leave undecided articles
+for fallback. Both duration settings accept positive integer milliseconds;
+missing or blank values use the defaults.
+Laya remains an independent shadow job, skipped when `LAYA_URL` is unset.
+
+For rollout: keep the default (Ollama stays primary, Jev keeps running in shadow),
+compare results at `/news/admin/jev` and on the scoreboard, tune the three Jev
+thresholds, then set `CURATOR_PROVIDER=jev` (optionally `CURATOR_FALLBACK=openai`)
+and remove `OLLAMA_URL`. The admin report uses the default thresholds; overrides
+only affect live decisions. Keep API keys in deployment secrets, never in version control.
+
+Jev and OpenAI label events retain their provider source. Existing weak-label
+training exports consume Ollama verdicts only, so these new providers do not
+add automated training labels. Reader and admin labels remain available.

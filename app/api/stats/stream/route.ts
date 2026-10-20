@@ -22,10 +22,11 @@ async function buildSnapshot(): Promise<StatsSnapshot> {
   const now = new Date();
   const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-  const [total, positive, last24h, range, byCategory, bySourceId, positiveBySourceId, sources] =
+  const [total, positive, pending, last24h, range, byCategory, bySourceId, positiveBySourceId, pendingBySourceId, sources] =
     await Promise.all([
       prisma.article.count(),
-      prisma.article.count({ where: { isPositive: true } }),
+      prisma.article.count({ where: { isPositive: true, curatedAt: { not: null } } }),
+      prisma.article.count({ where: { isPositive: true, curatedAt: null } }),
       prisma.article.count({ where: { publishedAt: { gte: yesterday } } }),
       prisma.article.aggregate({
         _min: { publishedAt: true },
@@ -40,7 +41,12 @@ async function buildSnapshot(): Promise<StatsSnapshot> {
       }),
       prisma.article.groupBy({
         by: ["sourceId"],
-        where: { isPositive: true },
+        where: { isPositive: true, curatedAt: { not: null } },
+        _count: { id: true },
+      }),
+      prisma.article.groupBy({
+        by: ["sourceId"],
+        where: { isPositive: true, curatedAt: null },
         _count: { id: true },
       }),
       prisma.source.findMany({ select: { id: true, name: true } }),
@@ -50,8 +56,13 @@ async function buildSnapshot(): Promise<StatsSnapshot> {
   const positiveCountBySource = new Map(
     positiveBySourceId.map((row) => [row.sourceId, row._count.id])
   );
+  const pendingCountBySource = new Map(
+    pendingBySourceId.map((row) => [row.sourceId, row._count.id])
+  );
+  // Articles awaiting a curator verdict are neither positive nor rejected.
+  const decided = total - pending;
   const rejectionRate =
-    total > 0 ? Math.round(((total - positive) / total) * 100) / 100 : 0;
+    decided > 0 ? Math.round(((decided - positive) / decided) * 100) / 100 : 0;
 
   return {
     pipeline: { running: isPipelineRunning() },
@@ -69,10 +80,11 @@ async function buildSnapshot(): Promise<StatsSnapshot> {
     bySources: bySourceId.map((row) => {
       const positiveCount = positiveCountBySource.get(row.sourceId) ?? 0;
       const total = row._count.id;
+      const decided = total - (pendingCountBySource.get(row.sourceId) ?? 0);
       return {
         name: sourceMap.get(row.sourceId) ?? "(unknown)",
         count: total,
-        rejectionRate: total > 0 ? Math.round(((total - positiveCount) / total) * 100) : 0,
+        rejectionRate: decided > 0 ? Math.round(((decided - positiveCount) / decided) * 100) : 0,
         lastArticle: row._max.publishedAt ?? null,
       };
     }),
