@@ -129,7 +129,7 @@ To add a source, edit `src/config/sources.ts`.
 - Node.js 22+
 - pnpm
 - PostgreSQL
-- Optional Ollama with `llama3.2:1b` model
+- Optional Ollama with the `gemma3:4b` model (the default; or set `OLLAMA_MODEL`)
 
 ### Install
 
@@ -138,7 +138,7 @@ git clone https://github.com/tonibergholm/positivenews.git
 cd positivenews
 pnpm install
 # Only if using Ollama:
-ollama pull llama3.2:1b
+ollama pull gemma3:4b
 ```
 
 ### Configure

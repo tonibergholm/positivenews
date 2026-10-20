@@ -158,11 +158,26 @@ it("stops scheduling batches after two consecutive failures so fallback keeps bu
   expect(await twoPass(articles, call, "openai", "test")).toEqual([]);
   expect(call).toHaveBeenCalledTimes(2);
 });
-it("resets the failure count after a successful batch", async () => {
-  const ok = { results: [{ id: "x", positive: false, reason: "negative" }] };
-  const call = vi.fn().mockRejectedValueOnce(new Error("x")).mockResolvedValueOnce(ok).mockRejectedValueOnce(new Error("x")).mockResolvedValue(ok);
+const verdictsFor = (field: string, value: boolean) => ({ results: Array.from({ length: 40 }, (_, i) => ({ id: String(i), [field]: value, reason: "r" })) });
+const batchOf40 = Array.from({ length: 40 }, (_, i) => ({ ...article, id: String(i) }));
+it("resets the failure count after a batch that produced decisions", async () => {
+  let n = 0;
+  const call = vi.fn().mockImplementation(async () => { if (++n % 2) throw new Error("x"); return verdictsFor("positive", false); });
   vi.spyOn(console, "error").mockImplementation(() => {});
-  const articles = Array.from({ length: 40 }, (_, i) => ({ ...article, id: String(i) }));
-  await twoPass(articles, call, "openai", "test");
+  expect(await twoPass(batchOf40, call, "openai", "test")).toHaveLength(20);
   expect(call).toHaveBeenCalledTimes(4);
+});
+it("counts repeated pass-two failures toward the limit", async () => {
+  const call = vi.fn().mockImplementation(async () => {
+    if (call.mock.calls.length % 2) return verdictsFor("positive", true);
+    throw new Error("pass two timeout");
+  });
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  expect(await twoPass(batchOf40, call, "openai", "test")).toEqual([]);
+  expect(call).toHaveBeenCalledTimes(4);
+});
+it("counts responses without matching ids as failures", async () => {
+  const call = vi.fn().mockResolvedValue({ results: [{ id: "other", positive: false, reason: "r" }] });
+  expect(await twoPass(batchOf40, call, "openai", "test")).toEqual([]);
+  expect(call).toHaveBeenCalledTimes(2);
 });

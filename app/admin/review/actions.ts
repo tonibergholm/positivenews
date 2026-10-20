@@ -28,18 +28,20 @@ async function actor(): Promise<string | null> {
 async function loadReveal(articleId: string): Promise<Reveal> {
   const [events, jev] = await Promise.all([
     prisma.labelEvent.findMany({
-      where: { articleId, source: { in: ["ollama", "openai", "keyword"] }, eligible: true },
+      where: { articleId, source: { in: ["ollama", "openai", "jev", "keyword"] }, eligible: true },
       orderBy: { createdAt: "desc" },
       select: { source: true, verdict: true },
     }),
     prisma.jevEvaluation.findFirst({ where: { articleId, questionSet: QUESTION_SET } }),
   ]);
+  // Prefer the verdict the live curator recorded; thresholds may have been overridden by env.
+  const liveJev = events.find((e) => e.source === "jev")?.verdict ?? null;
   return {
     ollama: events.find((e) => e.source === "ollama")?.verdict ?? null,
     openai: events.find((e) => e.source === "openai")?.verdict ?? null,
     keyword: events.some((e) => e.source === "keyword"),
     jev: jev
-      ? { keep: deriveVerdict(jev).keep, positiveP: jev.positiveP, upliftingP: jev.upliftingP, topCategory: CATEGORIES[jev.topCategory]?.label ?? jev.topCategory }
+      ? { keep: liveJev ? liveJev === "keep" : deriveVerdict(jev).keep, positiveP: jev.positiveP, upliftingP: jev.upliftingP, topCategory: CATEGORIES[jev.topCategory]?.label ?? jev.topCategory }
       : null,
   };
 }

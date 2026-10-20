@@ -31,6 +31,7 @@ export function jevKeep(data: { positiveP: number; upliftingP: number; topCatego
 
 export async function curateJev(articles: ArticleInput[], deadline = Date.now() + budgetMs()): Promise<CurationResult[]> {
   if (!process.env.TYPESAFE_API_KEY) throw new Error("TYPESAFE_API_KEY is required");
+  const thresholds = jevThresholds(); // fail the provider once, before any paid evaluation
   const results: CurationResult[] = [];
   let availabilityFailures = 0;
   await runPool(articles, 5, async (article) => {
@@ -46,7 +47,7 @@ export async function curateJev(articles: ArticleInput[], deadline = Date.now() 
         }
       }
       availabilityFailures = 0;
-      const verdict = jevDecision(data);
+      const verdict = deriveVerdict(data, thresholds);
       const keep = verdict.keep;
       const reason = `${verdict.reason ?? "jev: keep"} (positive=${data.positiveP.toFixed(2)}, uplifting=${data.upliftingP.toFixed(2)}, ${data.topCategory}=${data.topCategoryP.toFixed(2)})`;
       results.push({ id: article.id, isPositive: keep, reason, pass: 2, outcome: keep ? "judged_keep" : "judged_reject", source: "jev", model: data.model });

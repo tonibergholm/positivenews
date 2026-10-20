@@ -78,3 +78,10 @@ it("continues after article-specific HTTP failures", async () => {
   expect(await curateJev(Array.from({ length: 12 }, (_, i) => ({ ...article, id: String(i) })))).toEqual([]);
   expect(evaluateArticle).toHaveBeenCalledTimes(12);
 });
+
+it("rejects an invalid threshold before any paid evaluation", async () => {
+  vi.stubEnv("TYPESAFE_API_KEY", "test");
+  vi.stubEnv("JEV_KEEP_POSITIVE_THRESHOLD", "2");
+  await expect(curateJev([article, { ...article, id: "b" }])).rejects.toThrow("Invalid JEV_KEEP_POSITIVE_THRESHOLD");
+  expect(evaluateArticle).not.toHaveBeenCalled();
+});

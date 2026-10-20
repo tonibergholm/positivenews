@@ -29,9 +29,9 @@ export async function twoPass(
   for (let i = 0; i < articles.length; i += 10) {
     if (Date.now() >= deadline || failures >= MAX_CONSECUTIVE_FAILURES) break;
     const batch = articles.slice(i, i + 10);
+    const decidedBefore = results.length;
     try {
       const first = verdicts(await call(buildPass1Prompt(batch)), "positive");
-      failures = 0;
       const positives: ArticleInput[] = [];
       for (const article of batch) {
         const r = first.get(article.id);
@@ -39,13 +39,16 @@ export async function twoPass(
         if (r.keep) positives.push(article);
         else results.push({ id: article.id, isPositive: false, reason: r.reason, pass: 1, outcome: "judged_reject", source, model });
       }
-      if (!positives.length) continue;
-      if (Date.now() >= deadline) break;
-      const second = verdicts(await call(buildPass2Prompt(positives)), "keep");
-      for (const article of positives) {
-        const r = second.get(article.id);
-        if (r) results.push({ id: article.id, isPositive: r.keep, reason: r.reason, pass: 2, outcome: r.keep ? "judged_keep" : "judged_reject", source, model });
+      if (positives.length) {
+        if (Date.now() >= deadline) break;
+        const second = verdicts(await call(buildPass2Prompt(positives)), "keep");
+        for (const article of positives) {
+          const r = second.get(article.id);
+          if (r) results.push({ id: article.id, isPositive: r.keep, reason: r.reason, pass: 2, outcome: r.keep ? "judged_keep" : "judged_reject", source, model });
+        }
       }
+      // A batch only counts as healthy once every pass completed and it produced a decision.
+      failures = results.length > decidedBefore ? 0 : failures + 1;
     } catch (err) {
       failures++;
       console.error(`[curator] ${source} batch failed; undecided articles need fallback or retry`, err);
