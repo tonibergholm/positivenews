@@ -1,3 +1,4 @@
+import { FEED_SOURCES } from "../config/sources";
 import { afterEach, expect, it, vi } from "vitest";
 import { curateUnchecked } from "./curate";
 import { prisma } from "./prisma";
@@ -12,4 +13,14 @@ it("leaves failed articles uncurated and records no approval or rejection", asyn
   expect(recordCuratorResult).not.toHaveBeenCalled();
   expect(prisma.article.updateMany).not.toHaveBeenCalled();
   expect(prisma.$transaction).not.toHaveBeenCalled();
+});
+
+it("sets curatedAt when auto-approving a trusted source", async () => {
+  const source = FEED_SOURCES.find((s) => s.trusted)!;
+  vi.mocked(prisma.article.findMany).mockResolvedValue([{ id: "trusted", title: "A", summary: null, source: { url: source.url, language: "en" } }] as never);
+  expect(await curateUnchecked()).toEqual({ curated: 1, rejected: 0, skipped: 0 });
+  expect(prisma.article.updateMany).toHaveBeenCalledWith({
+    where: { id: { in: ["trusted"] }, isPositive: true, curatedAt: null },
+    data: { curatedAt: expect.any(Date) },
+  });
 });

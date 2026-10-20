@@ -8,6 +8,8 @@
 
 import { createHash } from "node:crypto";
 
+export const CURATOR_LABEL_SOURCES = ["ollama", "jev", "openai"] as const;
+
 export const LABEL_SOURCES = ["reader_flag", "admin", "ollama", "jev", "openai", "keyword"] as const;
 export type LabelSource = (typeof LABEL_SOURCES)[number];
 

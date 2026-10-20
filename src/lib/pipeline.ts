@@ -1,7 +1,6 @@
 import { curateUnchecked } from "./curate";
 import { ingestAll } from "./ingest";
 import { deactivateStaleKeywords, activatePendingKeywords } from "./keywords-maintenance";
-import { curatorConfig } from "./curator/config";
 import { shadowEvaluate } from "./jev-shadow";
 
 const JEV_SHADOW_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
@@ -31,9 +30,9 @@ export async function runPipeline(): Promise<PipelineResult> {
     const ingestResult = await ingestAll();
     const curationResult = await curateUnchecked();
 
-    // Keep comparison evaluations separate when Jev is not the primary curator.
+    // Evaluate articles the primary missed, including keyword rejections. Existing evaluations are skipped.
     try {
-      if (curatorConfig().primary !== "jev") await shadowEvaluate({
+      await shadowEvaluate({
         since: new Date(Date.now() - JEV_SHADOW_WINDOW_MS),
         limit: JEV_SHADOW_LIMIT,
         budgetMs: JEV_SHADOW_BUDGET_MS,

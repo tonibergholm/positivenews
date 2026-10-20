@@ -154,7 +154,7 @@ DATABASE_URL=postgresql://user:password@localhost:5432/positivenews
 INGEST_SECRET=<generate with: openssl rand -hex 32>
 # Optional Ollama overrides:
 # OLLAMA_URL=http://127.0.0.1:11434
-# OLLAMA_MODEL=llama3.2:1b
+# OLLAMA_MODEL=gemma3:4b
 ```
 
 ### Database
@@ -317,17 +317,21 @@ MIT
 
 ## Curator providers
 
-`CURATOR_PROVIDER` selects `jev`, `openai`, `ollama`, or `none`. When unset,
-it selects Ollama if `OLLAMA_URL` exists, otherwise Jev if `TYPESAFE_API_KEY`
-exists, otherwise none. Existing deployments (Ollama plus a Jev shadow key) keep
-Ollama until `CURATOR_PROVIDER` is set explicitly. `none` disables automated decisions for untrusted
-articles. Trusted sources still receive automatic approval.
+`CURATOR_PROVIDER` selects `jev`, `openai`, `ollama`, or `none`. When unset or
+empty, it always selects Ollama, regardless of available API keys. For upgrades
+from the legacy Ollama curator, provider selection does not change unless
+`CURATOR_PROVIDER` is set. Jev and OpenAI-compatible
+primaries require an explicit selection. `none` disables automated decisions for
+untrusted articles. Trusted sources still receive automatic approval. Articles
+appear in the public feed only after approval, with `isPositive = true` and a
+non-null `curatedAt`.
 
 Jev keeps an article with the same rule as the admin Jev report
 (`deriveVerdict` in `src/lib/jev.ts`): `positiveP >= JEV_KEEP_POSITIVE_THRESHOLD`
 (default 0.5), `upliftingP >= JEV_KEEP_UPLIFTING_THRESHOLD` (default 0.5) and
 `topCategoryP <= JEV_CATEGORY_VETO_THRESHOLD` (default 0.6). Evaluations are stored before decisions and reused
-on retry. The primary Jev provider replaces its shadow pipeline step.
+on retry. Shadow evaluation still runs when Jev is primary to cover articles the
+primary never sees, including keyword rejections. It skips existing evaluations.
 
 `CURATOR_FALLBACK` accepts `openai`, `ollama`, or `none` and defaults to `none`.
 Only articles without valid decisions go to fallback. Failed requests, invalid
@@ -347,8 +351,16 @@ For Gemini 2.5 Flash-Lite, set the base to
 two-pass prompts, JSON output, and temperature 0.1.
 
 Ollama is optional and is contacted only when selected as primary or fallback.
-Set `OLLAMA_URL` and optionally `OLLAMA_MODEL`, which defaults to `llama3.2:1b`.
+`OLLAMA_URL` defaults to `http://127.0.0.1:11434` and `OLLAMA_MODEL` defaults to
+`gemma3:4b`. Production explicitly sets `OLLAMA_MODEL=llama3.2:1b`.
 `CURATOR_TIMEOUT_MS` defaults to 30000 per request for all providers.
+`CURATOR_BUDGET_MS` defaults to 120000 for the entire curation run. Primary and
+fallback share that budget; fallback receives only the remaining time. Requests
+are capped at the remaining budget, and no new articles or batches start after
+the deadline. Two consecutive Jev availability failures, including timeouts,
+network errors or HTTP 5xx responses, stop its pool and leave undecided articles
+for fallback. Both duration settings accept positive integer milliseconds;
+missing or blank values use the defaults.
 Laya remains an independent shadow job, skipped when `LAYA_URL` is unset.
 
 For rollout: keep the default (Ollama stays primary, Jev keeps running in shadow),

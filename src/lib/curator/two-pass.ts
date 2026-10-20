@@ -19,9 +19,11 @@ export async function twoPass(
   call: (prompt: string) => Promise<unknown>,
   source: "openai" | "ollama",
   model: string,
+  deadline = Infinity,
 ): Promise<CurationResult[]> {
   const results: CurationResult[] = [];
   for (let i = 0; i < articles.length; i += 10) {
+    if (Date.now() >= deadline) break;
     const batch = articles.slice(i, i + 10);
     try {
       const first = verdicts(await call(buildPass1Prompt(batch)), "positive");
@@ -33,6 +35,7 @@ export async function twoPass(
         else results.push({ id: article.id, isPositive: false, reason: r.reason, pass: 1, outcome: "judged_reject", source, model });
       }
       if (!positives.length) continue;
+      if (Date.now() >= deadline) break;
       const second = verdicts(await call(buildPass2Prompt(positives)), "keep");
       for (const article of positives) {
         const r = second.get(article.id);

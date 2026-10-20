@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { curatorConfig } from "./config";
+import { budgetMs, curatorConfig, timeoutMs } from "./config";
 import { curateOpenAI } from "./openai";
-import { jevKeep } from "./jev";
+import { curateOllama } from "./ollama";
+import { twoPass } from "./two-pass";
+import { jevThresholds, jevKeep } from "./jev";
 vi.mock("../prisma", () => ({ prisma: {} }));
 const article = { id: "a", title: "A", language: "en" };
 const reply = (results: unknown) => ({ ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify({ results }) } }] }) });
@@ -13,9 +15,10 @@ beforeEach(() => {
   vi.stubEnv("CURATOR_OPENAI_API_KEY", "test-key");
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.useRealTimers(); });
-it("defaults safely: keeps Ollama when configured, else Jev, else none", () => {
-  expect(curatorConfig().primary).toBe("none");
-  vi.stubEnv("TYPESAFE_API_KEY", "test"); expect(curatorConfig().primary).toBe("jev");
+it("defaults to legacy Ollama regardless of available keys", () => {
+  expect(curatorConfig().primary).toBe("ollama");
+  vi.stubEnv("TYPESAFE_API_KEY", "test"); expect(curatorConfig().primary).toBe("ollama");
+  vi.stubEnv("CURATOR_PROVIDER", ""); expect(curatorConfig().primary).toBe("ollama");
   // Existing deployments (Ollama + Jev shadow key) keep Ollama until CURATOR_PROVIDER is set.
   vi.stubEnv("OLLAMA_URL", "http://ollama.test"); expect(curatorConfig().primary).toBe("ollama");
   vi.stubEnv("CURATOR_PROVIDER", "jev"); expect(curatorConfig().primary).toBe("jev");
@@ -61,4 +64,74 @@ describe("OpenAI-compatible HTTP", () => {
     })));
     expect(await curateOpenAI([article])).toEqual([]);
   });
+});
+
+it.each([undefined, "", "   "])("uses duration defaults for %s", (value) => {
+  vi.stubEnv("CURATOR_TIMEOUT_MS", value);
+  vi.stubEnv("CURATOR_BUDGET_MS", value);
+  expect(timeoutMs()).toBe(30000);
+  expect(budgetMs()).toBe(120000);
+});
+it.each(["0", "-1", "1.5", "1e3", "Infinity", "abc", "9007199254740992"])("rejects invalid duration %s", (value) => {
+  vi.stubEnv("CURATOR_TIMEOUT_MS", value);
+  vi.stubEnv("CURATOR_BUDGET_MS", value);
+  expect(timeoutMs).toThrow("Invalid CURATOR_TIMEOUT_MS");
+  expect(budgetMs).toThrow("Invalid CURATOR_BUDGET_MS");
+});
+it("trims positive integer durations", () => {
+  vi.stubEnv("CURATOR_TIMEOUT_MS", " 42 ");
+  vi.stubEnv("CURATOR_BUDGET_MS", " 123 ");
+  expect(timeoutMs()).toBe(42);
+  expect(budgetMs()).toBe(123);
+});
+it.each(["", "   ", "0", "NaN", "Infinity", "-0.1", "1.1"])("handles Jev threshold %s", (value) => {
+  vi.stubEnv("JEV_KEEP_POSITIVE_THRESHOLD", value);
+  if (["", "   ", "0"].includes(value)) expect(jevThresholds().positiveMin).toBe(value.trim() ? 0 : 0.5);
+  else expect(jevThresholds).toThrow();
+});
+it("uses Ollama's legacy URL and model defaults", async () => {
+  vi.stubEnv("OLLAMA_MODEL", undefined);
+  const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ response: JSON.stringify({ results: [{ id: "a", positive: false, reason: "negative" }] }) }) });
+  vi.stubGlobal("fetch", fetch);
+  expect(await curateOllama([article])).toMatchObject([{ source: "ollama", model: "gemma3:4b" }]);
+  expect(fetch.mock.calls[0][0]).toBe("http://127.0.0.1:11434/api/generate");
+  expect(JSON.parse(fetch.mock.calls[0][1].body).model).toBe("gemma3:4b");
+});
+it.each(["ollama", "openai"] as const)("stops %s batches at the deadline", async (source) => {
+  vi.useFakeTimers();
+  const deadline = Date.now() + 10;
+  const call = vi.fn().mockImplementation(async () => {
+    vi.setSystemTime(deadline);
+    return { results: [{ id: "a", positive: false, reason: "negative" }] };
+  });
+  expect(await twoPass(Array.from({ length: 11 }, (_, i) => ({ ...article, id: i ? String(i) : "a" })), call, source, "test", deadline)).toHaveLength(1);
+  expect(call).toHaveBeenCalledTimes(1);
+});
+it("does not start pass two after the deadline", async () => {
+  vi.useFakeTimers();
+  const deadline = Date.now() + 10;
+  const call = vi.fn().mockImplementation(async () => {
+    vi.setSystemTime(deadline);
+    return { results: [{ id: "a", positive: true, reason: "positive" }] };
+  });
+  expect(await twoPass([article], call, "openai", "test", deadline)).toEqual([]);
+  expect(call).toHaveBeenCalledTimes(1);
+});
+it("caps an HTTP request at the remaining budget", async () => {
+  const timeout = vi.spyOn(AbortSignal, "timeout");
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply([])));
+  await curateOpenAI([article], Date.now() + 100);
+  expect(timeout).toHaveBeenCalledWith(expect.any(Number));
+  expect(timeout.mock.calls[0][0]).toBeLessThanOrEqual(100);
+  timeout.mockRestore();
+});
+
+it("respects explicit Ollama URL and production model overrides", async () => {
+  vi.stubEnv("OLLAMA_URL", "http://ollama.test/");
+  vi.stubEnv("OLLAMA_MODEL", "llama3.2:1b");
+  const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ response: JSON.stringify({ results: [{ id: "a", positive: false, reason: "negative" }] }) }) });
+  vi.stubGlobal("fetch", fetch);
+  expect(await curateOllama([article])).toMatchObject([{ model: "llama3.2:1b" }]);
+  expect(fetch.mock.calls[0][0]).toBe("http://ollama.test/api/generate");
+  expect(JSON.parse(fetch.mock.calls[0][1].body).model).toBe("llama3.2:1b");
 });

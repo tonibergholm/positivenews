@@ -1,8 +1,8 @@
-import { timeoutMs } from "./config";
+import { budgetMs, requestTimeoutMs } from "./config";
 import { twoPass } from "./two-pass";
 import type { ArticleInput } from "./types";
 
-export async function curateOpenAI(articles: ArticleInput[]) {
+export async function curateOpenAI(articles: ArticleInput[], deadline = Date.now() + budgetMs()) {
   const key = process.env.CURATOR_OPENAI_API_KEY;
   if (!key) throw new Error("CURATOR_OPENAI_API_KEY is required");
   const base = (process.env.CURATOR_OPENAI_BASE_URL ?? "https://api.mistral.ai/v1").replace(/\/+$/, "");
@@ -12,12 +12,12 @@ export async function curateOpenAI(articles: ArticleInput[]) {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
       body: JSON.stringify({ model, messages: [{ role: "user", content: prompt }], response_format: { type: "json_object" }, temperature: 0.1 }),
-      signal: AbortSignal.timeout(timeoutMs()),
+      signal: AbortSignal.timeout(requestTimeoutMs(deadline)),
     });
     if (!response.ok) throw new Error(`OpenAI-compatible HTTP ${response.status}`);
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
     if (typeof content !== "string") throw new Error("Missing completion content");
     return JSON.parse(content.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, ""));
-  }, "openai", model);
+  }, "openai", model, deadline);
 }

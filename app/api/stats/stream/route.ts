@@ -25,7 +25,7 @@ async function buildSnapshot(): Promise<StatsSnapshot> {
   const [total, positive, last24h, range, byCategory, bySourceId, positiveBySourceId, sources] =
     await Promise.all([
       prisma.article.count(),
-      prisma.article.count({ where: { isPositive: true } }),
+      prisma.article.count({ where: { isPositive: true, curatedAt: { not: null } } }),
       prisma.article.count({ where: { publishedAt: { gte: yesterday } } }),
       prisma.article.aggregate({
         _min: { publishedAt: true },
@@ -40,7 +40,7 @@ async function buildSnapshot(): Promise<StatsSnapshot> {
       }),
       prisma.article.groupBy({
         by: ["sourceId"],
-        where: { isPositive: true },
+        where: { isPositive: true, curatedAt: { not: null } },
         _count: { id: true },
       }),
       prisma.source.findMany({ select: { id: true, name: true } }),
