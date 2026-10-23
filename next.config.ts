@@ -2,9 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   basePath: "/news",
-  // Allow external image domains from feed sources (https only)
+  // No next/image src is remote (article images use plain <img>), so no external host is allowed.
   images: {
-    remotePatterns: [{ protocol: "https", hostname: "**" }],
+    remotePatterns: [],
+    dangerouslyAllowSVG: false,
   },
   async headers() {
     return [
