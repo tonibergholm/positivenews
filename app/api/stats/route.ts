@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rejectionRateForCounts } from "@/src/lib/stats";
 import { prisma } from "@/src/lib/prisma";
 import { isPipelineRunning } from "@/src/lib/pipeline";
 
@@ -8,18 +9,7 @@ export async function GET() {
   const now = new Date();
   const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-  const [
-    total,
-    positive,
-    pending,
-    last24h,
-    range,
-    byCategory,
-    bySourceId,
-    positiveBySourceId,
-    pendingBySourceId,
-    sources,
-  ] = await Promise.all([
+  const queries = [
     prisma.article.count(),
     prisma.article.count({ where: { isPositive: true, curatedAt: { not: null } } }),
     prisma.article.count({ where: { isPositive: true, curatedAt: null } }),
@@ -49,7 +39,19 @@ export async function GET() {
       _count: { id: true },
     }),
     prisma.source.findMany({ select: { id: true, name: true } }),
-  ]);
+  ] as const;
+  const [
+    total,
+    positive,
+    pending,
+    last24h,
+    range,
+    byCategory,
+    bySourceId,
+    positiveBySourceId,
+    pendingBySourceId,
+    sources,
+  ] = await prisma.$transaction([...queries], { isolationLevel: "RepeatableRead" });
 
   const sourceMap = new Map(sources.map((s) => [s.id, s.name]));
   const positiveCountBySource = new Map(
@@ -61,9 +63,7 @@ export async function GET() {
   );
 
   // Articles awaiting a curator verdict are neither positive nor rejected.
-  const decided = total - pending;
-  const rejectionRate =
-    decided > 0 ? Math.round(((decided - positive) / decided) * 100) / 100 : 0;
+  const rejectionRate = rejectionRateForCounts(total, positive, pending) / 100;
 
   return NextResponse.json({
     pipeline: {
@@ -83,11 +83,11 @@ export async function GET() {
     bySources: bySourceId.map((row) => {
       const positiveCount = positiveCountBySource.get(row.sourceId) ?? 0;
       const total = row._count.id;
-      const decided = total - (pendingCountBySource.get(row.sourceId) ?? 0);
+      const pendingCount = pendingCountBySource.get(row.sourceId) ?? 0;
       return {
         name: sourceMap.get(row.sourceId) ?? "(unknown)",
         count: total,
-        rejectionRate: decided > 0 ? Math.round(((decided - positiveCount) / decided) * 100) : 0,
+        rejectionRate: rejectionRateForCounts(total, positiveCount, pendingCount),
         lastArticle: row._max.publishedAt ?? null,
       };
     }),

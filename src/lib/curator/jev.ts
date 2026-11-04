@@ -39,6 +39,7 @@ export async function curateJev(articles: ArticleInput[], deadline = Date.now() 
       let data = await prisma.jevEvaluation.findUnique({ where: { articleId_questionSet: { articleId: article.id, questionSet: QUESTION_SET } } });
       if (!data) {
         const evaluated = await evaluateArticle(article, { timeout: requestTimeoutMs(deadline), retry: { maxRetries: 0 } });
+        availabilityFailures = 0;
         try {
           data = await prisma.jevEvaluation.create({ data: { ...evaluated, articleId: article.id, questionSet: QUESTION_SET, answers: evaluated.answers as Prisma.InputJsonValue } });
         } catch (err) {
@@ -46,7 +47,6 @@ export async function curateJev(articles: ArticleInput[], deadline = Date.now() 
           data = await prisma.jevEvaluation.findUniqueOrThrow({ where: { articleId_questionSet: { articleId: article.id, questionSet: QUESTION_SET } } });
         }
       }
-      availabilityFailures = 0;
       const verdict = deriveVerdict(data, thresholds);
       const keep = verdict.keep;
       const reason = `${verdict.reason ?? "jev: keep"} (positive=${data.positiveP.toFixed(2)}, uplifting=${data.upliftingP.toFixed(2)}, ${data.topCategory}=${data.topCategoryP.toFixed(2)})`;
