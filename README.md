@@ -272,6 +272,12 @@ Client ──► nginx (SSL, /news) ──► PM2 (port 3001) ──► Next.js
                                                         └── PostgreSQL
 ```
 
+The production server has 4 vCPUs, 7.7 GB of RAM, no GPU and no swap. Other apps
+share it and its Ollama instance. Ollama runs with `OLLAMA_MAX_LOADED_MODELS=1`
+(systemd drop-in `/etc/systemd/system/ollama.service.d/max-loaded.conf`), so
+models load one at a time instead of exhausting memory. Check free RAM before
+choosing a larger model or re-enabling Laya.
+
 Deploy updates:
 
 ```bash
@@ -303,7 +309,8 @@ LearnedKeyword
 | File | Purpose |
 |------|---------|
 | `src/lib/classifier.ts` | Keyword pre-filter with Finnish stem awareness |
-| `src/lib/llm-curator.ts` | Two-tier Ollama LLM curation (pass 1 + pass 2 prompts) |
+| `src/lib/curator/` | Curator providers (Jev, OpenAI-compatible, Ollama), two-pass prompts, timeouts |
+| `src/lib/llm-curator.ts` | Compatibility export of the Ollama curator |
 | `src/lib/curate.ts` | Post-ingest curation job orchestrator |
 | `src/lib/ingest.ts` | RSS ingestion with URL dedup and validation |
 | `src/lib/keywords.ts` | Keyword extraction from flagged article titles |
@@ -352,7 +359,11 @@ two-pass prompts, JSON output, and temperature 0.1.
 
 Ollama is optional and is contacted only when selected as primary or fallback.
 `OLLAMA_URL` defaults to `http://127.0.0.1:11434` and `OLLAMA_MODEL` defaults to
-`gemma3:4b`. Production explicitly sets `OLLAMA_MODEL=llama3.2:1b`.
+`gemma3:4b`. Production has used `gemma3:4b` since 2026-11-04. It replaced
+`llama3.2:1b`, which returned usable batch JSON for only about 4% of articles
+(see `docs/curator-model-evaluation-2026-11.md`). On the production server's
+CPU, `gemma3:4b` needs about 40 s per 10-article call, so production sets
+`CURATOR_TIMEOUT_MS=90000` and `CURATOR_BUDGET_MS=300000`.
 `CURATOR_TIMEOUT_MS` defaults to 30000 per request for all providers.
 `CURATOR_BUDGET_MS` defaults to 120000 for the entire curation run. Primary and
 fallback share that budget; fallback receives only the remaining time. Requests
@@ -362,6 +373,8 @@ network errors or HTTP 5xx responses, stop its pool and leave undecided articles
 for fallback. Both duration settings accept positive integer milliseconds;
 missing or blank values use the defaults.
 Laya remains an independent shadow job, skipped when `LAYA_URL` is unset.
+Production has had it disabled since 2026-11-04: the server does not have enough
+RAM to run Laya next to `gemma3:4b`.
 
 For rollout: keep the default (Ollama stays primary, Jev keeps running in shadow),
 compare results at `/news/admin/jev` and on the scoreboard, tune the three Jev

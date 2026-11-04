@@ -44,6 +44,8 @@ Thresholds: batch-8 p95 under 20 s, `rss_mb` under 2500, `available_mb` over 100
 
 ## Enable the shadow in the app
 
+**Status (2026-11-04):** disabled in production. `pm2 laya` is stopped and `LAYA_URL` is commented out in the server `.env`, because the server cannot run Laya (about 2.3 GB RSS) next to the `gemma3:4b` curator. To re-enable it, free RAM first, run `bench.sh`, then follow the steps below and `pm2 start laya`. An Astra weight-space diagnosis of the `20261007-20261007T150051-16bace` checkpoint found no editable defect. It traced the Finnish weakness mainly to noisy historical-approval labels (see #14).
+
 Set `LAYA_URL=http://127.0.0.1:8100` and `LAYA_TIMEOUT_MS` (60000 is a safe start) in the server `.env`, then restart the app. Remove `LAYA_URL` to disable. The app checks `contract_hash` from `/health` against its own `contractHash()`.
 
 ## Serving notes
